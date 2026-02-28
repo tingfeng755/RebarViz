@@ -11,11 +11,17 @@ import { SlabCrossSection } from '@/components/CrossSection';
 import { SlabExplain } from '@/components/NotationExplain';
 import { WeightCalc } from '@/components/WeightCalc';
 import { ShareButton } from '@/components/ShareButton';
-import { Field, NumField, Legend, ResetButton, SelectField } from '@/components/FormControls';
+import { Field, NumField, Legend, ResetButton, SelectField, Section } from '@/components/FormControls';
 import { ViewerSkeleton } from '@/components/ViewerSkeleton';
 import { CONCRETE_GRADES } from '@/lib/anchor';
-import { AIChat } from '@/components/AIChat';
+import { AISidebar } from '@/components/AISidebar';
 import { buildSlabContext } from '@/lib/ai-context';
+import { Sparkles } from 'lucide-react';
+
+const DATA_TABS = [
+  { key: 'section', label: '截面图' },
+  { key: 'weight', label: '用量估算' },
+] as const;
 
 const SlabViewer = dynamic(() => import('@/components/SlabViewer'), {
   ssr: false,
@@ -32,6 +38,8 @@ const DEFAULT = { ...SLAB_PRESETS.standard };
 
 export function SlabPageClient() {
   const [params, setParams] = useState<SlabParams>(DEFAULT);
+  const [dataTab, setDataTab] = useState<typeof DATA_TABS[number]['key']>('section');
+  const [showAI, setShowAI] = useState(false);
 
   useEffect(() => {
     const shared = decodeShareParams<SlabParams>(window.location.search);
@@ -55,7 +63,7 @@ export function SlabPageClient() {
     <main className="px-4 py-4">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* 左栏：参数输入 */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-3 space-y-4 lg:sticky lg:top-[60px] lg:max-h-[calc(100vh-76px)] lg:overflow-y-auto lg:scrollbar-thin">
           <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-primary">参数输入</h2>
@@ -80,37 +88,28 @@ export function SlabPageClient() {
             <div className="space-y-3">
               <Field label="板编号" value={params.id} onChange={v => update({ id: v })} />
               <NumField label="板厚 (mm)" value={params.thickness} onChange={v => update({ thickness: v })} error={errors.thickness?.message} min={60} max={400} />
-
-              <div className="pt-2 border-t border-gray-100">
-                <p className="text-xs font-medium text-primary mb-2">材料与构造</p>
-                <div className="space-y-3">
-                  <SelectField label="混凝土等级" value={params.concreteGrade} onChange={v => update({ concreteGrade: v as any })}
-                    options={CONCRETE_GRADES.map(g => ({ value: g, label: g }))} />
-                  <NumField label="保护层 (mm)" value={params.cover} onChange={v => update({ cover: v })} min={10} max={30} />
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-gray-100">
-                <p className="text-xs font-medium text-primary mb-2">底筋</p>
-                <div className="space-y-3">
-                  <Field label="X向底筋" value={params.bottomX} onChange={v => update({ bottomX: v })} placeholder="如: C12@150" error={errors.bottomX?.message} />
-                  <Field label="Y向底筋" value={params.bottomY} onChange={v => update({ bottomY: v })} placeholder="如: C10@200" error={errors.bottomY?.message} />
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-gray-100">
-                <p className="text-xs font-medium text-primary mb-1">面筋</p>
-                <p className="text-[11px] text-muted mb-2">留空表示无面筋</p>
-                <div className="space-y-3">
-                  <Field label="X向面筋" value={params.topX} onChange={v => update({ topX: v })} placeholder="如: C10@200" error={errors.topX?.message} />
-                  <Field label="Y向面筋" value={params.topY} onChange={v => update({ topY: v })} placeholder="如: C10@200" error={errors.topY?.message} />
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-gray-100">
-                <Field label="分布筋" value={params.distribution} onChange={v => update({ distribution: v })} placeholder="如: A6@250" error={errors.distribution?.message} />
-              </div>
             </div>
+
+            <Section title="材料与构造">
+              <SelectField label="混凝土等级" value={params.concreteGrade} onChange={v => update({ concreteGrade: v as any })}
+                options={CONCRETE_GRADES.map(g => ({ value: g, label: g }))} />
+              <NumField label="保护层 (mm)" value={params.cover} onChange={v => update({ cover: v })} min={10} max={30} />
+            </Section>
+
+            <Section title="底筋" defaultOpen>
+              <Field label="X向底筋" value={params.bottomX} onChange={v => update({ bottomX: v })} placeholder="如: C12@150" error={errors.bottomX?.message} />
+              <Field label="Y向底筋" value={params.bottomY} onChange={v => update({ bottomY: v })} placeholder="如: C10@200" error={errors.bottomY?.message} />
+            </Section>
+
+            <Section title="面筋">
+              <p className="text-[11px] text-muted -mt-1">留空表示无面筋</p>
+              <Field label="X向面筋" value={params.topX} onChange={v => update({ topX: v })} placeholder="如: C10@200" error={errors.topX?.message} />
+              <Field label="Y向面筋" value={params.topY} onChange={v => update({ topY: v })} placeholder="如: C10@200" error={errors.topY?.message} />
+            </Section>
+
+            <Section title="分布筋">
+              <Field label="分布筋" value={params.distribution} onChange={v => update({ distribution: v })} placeholder="如: A6@250" error={errors.distribution?.message} />
+            </Section>
           </div>
 
           <Legend items={[
@@ -122,27 +121,50 @@ export function SlabPageClient() {
           ]} />
         </div>
 
-        {/* 中栏：3D模型 + 截面 + 用量 */}
-        <div className="lg:col-span-7 space-y-4 min-w-0">
+        {/* 中栏：3D模型 + 数据 tab */}
+        <div className={`${showAI ? 'lg:col-span-6' : 'lg:col-span-9'} space-y-4 min-w-0 transition-all`}>
           <SlabViewer params={params} />
-          <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
-            <h2 className="text-sm font-semibold text-primary mb-3">截面配筋示意</h2>
-            <div className="flex justify-center">
-              <SlabCrossSection params={params} />
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center border-b border-gray-100">
+              {DATA_TABS.map(t => (
+                <button key={t.key} onClick={() => setDataTab(t.key)}
+                  className={`px-4 py-2.5 text-xs font-medium transition-colors cursor-pointer ${dataTab === t.key ? 'text-accent border-b-2 border-accent bg-accent/5' : 'text-muted hover:text-primary hover:bg-gray-50'}`}>
+                  {t.label}
+                </button>
+              ))}
+              <button onClick={() => setShowAI(a => !a)}
+                className={`ml-auto mr-2 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 ${showAI ? 'bg-accent text-white' : 'text-muted hover:text-primary hover:bg-gray-50'}`}>
+                <Sparkles className="w-3.5 h-3.5" />
+                AI
+              </button>
+            </div>
+            <div className="p-5">
+              {dataTab === 'section' && (
+                <>
+                  <h2 className="text-sm font-semibold text-primary mb-3">截面配筋示意</h2>
+                  <div className="flex justify-center">
+                    <SlabCrossSection params={params} />
+                  </div>
+                </>
+              )}
+              {dataTab === 'weight' && <WeightCalc result={calcResult} />}
             </div>
           </div>
-          <WeightCalc result={calcResult} />
         </div>
 
-        {/* 右栏：标注解读 */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-            <h2 className="text-sm font-semibold text-primary mb-3">标注解读</h2>
-            <SlabExplain params={params} />
+        {/* 右栏：AI 侧边栏（可收起） */}
+        {showAI && (
+          <div className="lg:col-span-3">
+            <AISidebar
+              componentType="slab"
+              currentParams={params}
+              onApplyParams={(p) => update(p as Partial<SlabParams>)}
+              context={aiContext}
+              notationSlot={<SlabExplain params={params} />}
+            />
           </div>
-        </div>
+        )}
       </div>
-      <AIChat context={aiContext} />
     </main>
   );
 }

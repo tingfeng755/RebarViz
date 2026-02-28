@@ -8,11 +8,12 @@ import { decodeShareParams } from '@/lib/useShareUrl';
 import { validateRebar, validateStirrup, validateDimension } from '@/lib/validate';
 import { JointExplain } from '@/components/NotationExplain';
 import { ShareButton } from '@/components/ShareButton';
-import { Field, NumField, Legend, ResetButton, SelectField } from '@/components/FormControls';
+import { Field, NumField, Legend, ResetButton, SelectField, Section } from '@/components/FormControls';
 import { ViewerSkeleton } from '@/components/ViewerSkeleton';
 import { CONCRETE_GRADES, SEISMIC_GRADES } from '@/lib/anchor';
-import { AIChat } from '@/components/AIChat';
+import { AISidebar } from '@/components/AISidebar';
 import { buildJointContext } from '@/lib/ai-context';
+import { Sparkles } from 'lucide-react';
 
 const JointViewer = dynamic(() => import('@/components/JointViewer'), {
   ssr: false,
@@ -29,6 +30,7 @@ const DEFAULT = { ...JOINT_PRESETS.middleBent };
 
 export function JointPageClient() {
   const [params, setParams] = useState<JointParams>(DEFAULT);
+  const [showAI, setShowAI] = useState(false);
 
   useEffect(() => {
     const shared = decodeShareParams<JointParams>(window.location.search);
@@ -54,7 +56,7 @@ export function JointPageClient() {
     <main className="px-4 py-4">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* 左栏：参数输入 */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-3 space-y-4 lg:sticky lg:top-[60px] lg:max-h-[calc(100vh-76px)] lg:overflow-y-auto lg:scrollbar-thin">
           <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-primary">参数输入</h2>
@@ -99,39 +101,30 @@ export function JointPageClient() {
                   ))}
                 </div>
               </div>
-
-              <div className="pt-2 border-t border-gray-100">
-                <p className="text-xs font-medium text-primary mb-2">材料与构造</p>
-                <div className="space-y-3">
-                  <SelectField label="混凝土等级" value={params.concreteGrade} onChange={v => update({ concreteGrade: v as any })}
-                    options={CONCRETE_GRADES.map(g => ({ value: g, label: g }))} />
-                  <SelectField label="抗震等级" value={params.seismicGrade} onChange={v => update({ seismicGrade: v as any })}
-                    options={SEISMIC_GRADES.map(g => ({ value: g, label: g }))} />
-                  <NumField label="保护层 (mm)" value={params.cover} onChange={v => update({ cover: v })} min={15} max={50} />
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-gray-100">
-                <p className="text-xs font-medium text-primary mb-2">柱参数</p>
-                <div className="space-y-3">
-                  <NumField label="柱宽 b (mm)" value={params.colB} onChange={v => update({ colB: v })} error={errors.colB?.message} min={200} max={1200} />
-                  <NumField label="柱高 h (mm)" value={params.colH} onChange={v => update({ colH: v })} error={errors.colH?.message} min={200} max={1200} />
-                  <Field label="柱纵筋" value={params.colMain} onChange={v => update({ colMain: v })} placeholder="如: 12C25" error={errors.colMain?.message} />
-                  <Field label="柱箍筋" value={params.colStirrup} onChange={v => update({ colStirrup: v })} placeholder="如: A10@100/200(4)" error={errors.colStirrup?.message} />
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-gray-100">
-                <p className="text-xs font-medium text-primary mb-2">梁参数</p>
-                <div className="space-y-3">
-                  <NumField label="梁宽 b (mm)" value={params.beamB} onChange={v => update({ beamB: v })} error={errors.beamB?.message} min={150} max={800} />
-                  <NumField label="梁高 h (mm)" value={params.beamH} onChange={v => update({ beamH: v })} error={errors.beamH?.message} min={200} max={1200} />
-                  <Field label="梁上部筋" value={params.beamTop} onChange={v => update({ beamTop: v })} placeholder="如: 4C25" error={errors.beamTop?.message} />
-                  <Field label="梁下部筋" value={params.beamBottom} onChange={v => update({ beamBottom: v })} placeholder="如: 4C25" error={errors.beamBottom?.message} />
-                  <Field label="梁箍筋" value={params.beamStirrup} onChange={v => update({ beamStirrup: v })} placeholder="如: A8@100/200(2)" error={errors.beamStirrup?.message} />
-                </div>
-              </div>
             </div>
+
+            <Section title="材料与构造">
+              <SelectField label="混凝土等级" value={params.concreteGrade} onChange={v => update({ concreteGrade: v as any })}
+                options={CONCRETE_GRADES.map(g => ({ value: g, label: g }))} />
+              <SelectField label="抗震等级" value={params.seismicGrade} onChange={v => update({ seismicGrade: v as any })}
+                options={SEISMIC_GRADES.map(g => ({ value: g, label: g }))} />
+              <NumField label="保护层 (mm)" value={params.cover} onChange={v => update({ cover: v })} min={15} max={50} />
+            </Section>
+
+            <Section title="柱参数" defaultOpen>
+              <NumField label="柱宽 b (mm)" value={params.colB} onChange={v => update({ colB: v })} error={errors.colB?.message} min={200} max={1200} />
+              <NumField label="柱高 h (mm)" value={params.colH} onChange={v => update({ colH: v })} error={errors.colH?.message} min={200} max={1200} />
+              <Field label="柱纵筋" value={params.colMain} onChange={v => update({ colMain: v })} placeholder="如: 12C25" error={errors.colMain?.message} />
+              <Field label="柱箍筋" value={params.colStirrup} onChange={v => update({ colStirrup: v })} placeholder="如: A10@100/200(4)" error={errors.colStirrup?.message} />
+            </Section>
+
+            <Section title="梁参数" defaultOpen>
+              <NumField label="梁宽 b (mm)" value={params.beamB} onChange={v => update({ beamB: v })} error={errors.beamB?.message} min={150} max={800} />
+              <NumField label="梁高 h (mm)" value={params.beamH} onChange={v => update({ beamH: v })} error={errors.beamH?.message} min={200} max={1200} />
+              <Field label="梁上部筋" value={params.beamTop} onChange={v => update({ beamTop: v })} placeholder="如: 4C25" error={errors.beamTop?.message} />
+              <Field label="梁下部筋" value={params.beamBottom} onChange={v => update({ beamBottom: v })} placeholder="如: 4C25" error={errors.beamBottom?.message} />
+              <Field label="梁箍筋" value={params.beamStirrup} onChange={v => update({ beamStirrup: v })} placeholder="如: A8@100/200(2)" error={errors.beamStirrup?.message} />
+            </Section>
           </div>
 
           <Legend items={[
@@ -144,19 +137,30 @@ export function JointPageClient() {
         </div>
 
         {/* 中栏：3D模型 */}
-        <div className="lg:col-span-7 min-w-0">
-          <JointViewer params={params} />
-        </div>
-
-        {/* 右栏：构造解读 */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-            <h2 className="text-sm font-semibold text-primary mb-3">构造解读</h2>
-            <JointExplain params={params} />
+        <div className={`${showAI ? 'lg:col-span-6' : 'lg:col-span-9'} min-w-0 transition-all`}>
+          <div className="relative">
+            <JointViewer params={params} />
+            <button onClick={() => setShowAI(a => !a)}
+              className={`absolute top-3 right-3 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 shadow-sm ${showAI ? 'bg-accent text-white' : 'bg-white/90 text-muted hover:text-primary hover:bg-white'}`}>
+              <Sparkles className="w-3.5 h-3.5" />
+              AI
+            </button>
           </div>
         </div>
+
+        {/* 右栏：AI 侧边栏（可收起） */}
+        {showAI && (
+          <div className="lg:col-span-3">
+            <AISidebar
+              componentType="joint"
+              currentParams={params}
+              onApplyParams={(p) => update(p as Partial<JointParams>)}
+              context={aiContext}
+              notationSlot={<JointExplain params={params} />}
+            />
+          </div>
+        )}
       </div>
-      <AIChat context={aiContext} />
     </main>
   );
 }

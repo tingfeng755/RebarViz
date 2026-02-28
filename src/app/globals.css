@@ -12,11 +12,3 @@
   --color-concrete: #BDC3C7;
   --color-border: #e2e8f0;
 }
-
-@font-face {
-  font-family: 'Noto Sans SC';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
-}

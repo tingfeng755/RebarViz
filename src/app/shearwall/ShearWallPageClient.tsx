@@ -2,20 +2,20 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import type { ColumnParams } from '@/lib/types';
-import { COLUMN_PRESETS } from '@/lib/rebar';
-import { calcColumn } from '@/lib/calc';
+import type { ShearWallParams } from '@/lib/types';
+import { SHEAR_WALL_PRESETS } from '@/lib/rebar';
+import { calcShearWall } from '@/lib/calc';
 import { decodeShareParams } from '@/lib/useShareUrl';
-import { validateRebar, validateStirrup, validateDimension } from '@/lib/validate';
-import { ColumnCrossSection } from '@/components/CrossSection';
-import { ColumnExplain } from '@/components/NotationExplain';
+import { validateDimension } from '@/lib/validate';
+import { ShearWallCrossSection } from '@/components/CrossSection';
+import { ShearWallExplain } from '@/components/NotationExplain';
 import { WeightCalc } from '@/components/WeightCalc';
 import { ShareButton } from '@/components/ShareButton';
 import { Field, NumField, Legend, ResetButton, SelectField, Section } from '@/components/FormControls';
 import { ViewerSkeleton } from '@/components/ViewerSkeleton';
 import { CONCRETE_GRADES, SEISMIC_GRADES } from '@/lib/anchor';
 import { AISidebar } from '@/components/AISidebar';
-import { buildColumnContext } from '@/lib/ai-context';
+import { buildShearWallContext } from '@/lib/ai-context';
 import { Sparkles } from 'lucide-react';
 
 const DATA_TABS = [
@@ -23,39 +23,38 @@ const DATA_TABS = [
   { key: 'weight', label: '用量估算' },
 ] as const;
 
-const ColumnViewer = dynamic(() => import('@/components/ColumnViewer'), {
+const ShearWallViewer = dynamic(() => import('@/components/ShearWallViewer'), {
   ssr: false,
   loading: () => <ViewerSkeleton />,
 });
 
 const presetList = [
-  { key: 'simple', label: '简单柱', color: 'bg-blue-50 text-blue-700' },
-  { key: 'standard', label: '标准柱', color: 'bg-green-50 text-green-700' },
+  { key: 'simple', label: '简单墙', color: 'bg-blue-50 text-blue-700' },
+  { key: 'standard', label: '标准墙', color: 'bg-green-50 text-green-700' },
 ] as const;
 
-const DEFAULT = { ...COLUMN_PRESETS.standard };
+const DEFAULT = { ...SHEAR_WALL_PRESETS.standard };
 
-export function ColumnPageClient() {
-  const [params, setParams] = useState<ColumnParams>(DEFAULT);
+export function ShearWallPageClient() {
+  const [params, setParams] = useState<ShearWallParams>(DEFAULT);
   const [cutPosition, setCutPosition] = useState<number | null>(null);
   const [showCut, setShowCut] = useState(false);
   const [dataTab, setDataTab] = useState<typeof DATA_TABS[number]['key']>('section');
   const [showAI, setShowAI] = useState(false);
 
   useEffect(() => {
-    const shared = decodeShareParams<ColumnParams>(window.location.search);
-    if (shared && shared.b && shared.h) setParams(shared);
+    const shared = decodeShareParams<ShearWallParams>(window.location.search);
+    if (shared && shared.bw && shared.lw) setParams(shared);
   }, []);
 
-  const update = (patch: Partial<ColumnParams>) => setParams(p => ({ ...p, ...patch }));
-  const calcResult = useMemo(() => calcColumn(params), [params]);
-  const aiContext = useMemo(() => buildColumnContext(params), [params]);
+  const update = (patch: Partial<ShearWallParams>) => setParams(p => ({ ...p, ...patch }));
+  const calcResult = useMemo(() => calcShearWall(params), [params]);
+  const aiContext = useMemo(() => buildShearWallContext(params), [params]);
 
   const errors = useMemo(() => ({
-    b: validateDimension(params.b, 'b', 200, 1200),
-    h: validateDimension(params.h, 'h', 200, 1200),
-    main: validateRebar(params.main, 'main'),
-    stirrup: validateStirrup(params.stirrup, 'stirrup'),
+    bw: validateDimension(params.bw, 'bw', 150, 500),
+    lw: validateDimension(params.lw, 'lw', 500, 8000),
+    hw: validateDimension(params.hw, 'hw', 1000, 10000),
   }), [params]);
 
   return (
@@ -76,7 +75,7 @@ export function ColumnPageClient() {
               <label className="text-xs text-muted mb-2 block">快速示例</label>
               <div className="flex flex-wrap gap-2">
                 {presetList.map(({ key, label, color }) => (
-                  <button key={key} onClick={() => setParams({ ...COLUMN_PRESETS[key] })}
+                  <button key={key} onClick={() => setParams({ ...SHEAR_WALL_PRESETS[key] })}
                     className={`px-2 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors hover:opacity-80 ${color}`}>
                     {label}
                   </button>
@@ -85,12 +84,21 @@ export function ColumnPageClient() {
             </div>
 
             <div className="space-y-3">
-              <Field label="柱编号" value={params.id} onChange={v => update({ id: v })} />
-              <NumField label="截面宽 b (mm)" value={params.b} onChange={v => update({ b: v })} error={errors.b?.message} min={200} max={1200} />
-              <NumField label="截面高 h (mm)" value={params.h} onChange={v => update({ h: v })} error={errors.h?.message} min={200} max={1200} />
-              <Field label="全部纵筋" value={params.main} onChange={v => update({ main: v })} placeholder="如: 12C25" error={errors.main?.message} />
-              <Field label="箍筋" value={params.stirrup} onChange={v => update({ stirrup: v })} placeholder="如: A10@100/200(4)" error={errors.stirrup?.message} />
+              <Field label="墙编号" value={params.id} onChange={v => update({ id: v })} />
+              <NumField label="墙厚 bw (mm)" value={params.bw} onChange={v => update({ bw: v })} error={errors.bw?.message} min={150} max={500} />
+              <NumField label="墙长 lw (mm)" value={params.lw} onChange={v => update({ lw: v })} error={errors.lw?.message} min={500} max={8000} />
+              <NumField label="墙净高 hw (mm)" value={params.hw} onChange={v => update({ hw: v })} error={errors.hw?.message} min={1000} max={10000} />
             </div>
+
+            <Section title="分布筋" defaultOpen>
+              <Field label="竖向分布筋" value={params.vertBar} onChange={v => update({ vertBar: v })} placeholder="如: C10@200" />
+              <Field label="水平分布筋" value={params.horizBar} onChange={v => update({ horizBar: v })} placeholder="如: C10@200" />
+            </Section>
+
+            <Section title="约束边缘构件">
+              <Field label="纵筋" value={params.boundaryMain} onChange={v => update({ boundaryMain: v })} placeholder="如: 8C16" />
+              <Field label="箍筋" value={params.boundaryStirrup} onChange={v => update({ boundaryStirrup: v })} placeholder="如: A8@100" />
+            </Section>
 
             <Section title="材料与构造">
               <SelectField label="混凝土等级" value={params.concreteGrade} onChange={v => update({ concreteGrade: v as any })}
@@ -98,20 +106,21 @@ export function ColumnPageClient() {
               <SelectField label="抗震等级" value={params.seismicGrade} onChange={v => update({ seismicGrade: v as any })}
                 options={SEISMIC_GRADES.map(g => ({ value: g, label: g }))} />
               <NumField label="保护层 (mm)" value={params.cover} onChange={v => update({ cover: v })} min={15} max={50} />
-              <NumField label="柱净高 (mm)" value={params.height} onChange={v => update({ height: v })} min={1000} max={10000} />
             </Section>
           </div>
 
           <Legend items={[
-            { color: '#C0392B', label: '纵向受力钢筋' },
-            { color: '#27AE60', label: '箍筋' },
-            { color: '#BDC3C7', label: '混凝土截面（半透明）', opacity: 0.6 },
+            { color: '#C0392B', label: '竖向分布筋' },
+            { color: '#2980B9', label: '水平分布筋' },
+            { color: '#8E44AD', label: '边缘构件纵筋' },
+            { color: '#27AE60', label: '边缘构件箍筋' },
+            { color: '#BDC3C7', label: '混凝土墙体（半透明）', opacity: 0.6 },
           ]} />
         </div>
 
         {/* 中栏：3D模型 + 数据 tab */}
         <div className={`${showAI ? 'lg:col-span-6' : 'lg:col-span-9'} space-y-4 min-w-0 transition-all`}>
-          <ColumnViewer params={params} cutPosition={cutPosition} showCut={showCut}
+          <ShearWallViewer params={params} cutPosition={cutPosition} showCut={showCut}
             onCutPositionChange={setCutPosition} onShowCutChange={setShowCut} />
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center border-b border-gray-100">
@@ -132,10 +141,10 @@ export function ColumnPageClient() {
                 <>
                   <h2 className="text-sm font-semibold text-primary mb-3">
                     截面配筋示意
-                    {showCut && <span className="text-xs font-normal text-muted ml-2">· 跟随剖切位置</span>}
+                    {showCut && <span className="text-xs font-normal text-muted ml-2">· 水平截面</span>}
                   </h2>
                   <div className="flex justify-center">
-                    <ColumnCrossSection params={params} cutPosition={showCut ? cutPosition : undefined} />
+                    <ShearWallCrossSection params={params} />
                   </div>
                 </>
               )}
@@ -148,11 +157,11 @@ export function ColumnPageClient() {
         {showAI && (
           <div className="lg:col-span-3">
             <AISidebar
-              componentType="column"
+              componentType="shearwall"
               currentParams={params}
-              onApplyParams={(p) => update(p as Partial<ColumnParams>)}
+              onApplyParams={(p) => update(p as Partial<ShearWallParams>)}
               context={aiContext}
-              notationSlot={<ColumnExplain params={params} />}
+              notationSlot={<ShearWallExplain params={params} />}
             />
           </div>
         )}

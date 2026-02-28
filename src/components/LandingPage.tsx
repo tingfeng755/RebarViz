@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  ArrowRight, Columns3, Box, LayoutGrid, GitMerge,
+  ArrowRight, Columns3, Box, LayoutGrid, GitMerge, Wallpaper,
   RotateCcw, MousePointerClick, Scissors, BookOpen, Sparkles, Layers,
   ChevronDown, Zap, Eye, Brain,
 } from 'lucide-react';
@@ -196,6 +196,12 @@ const COMPONENTS = [
     gradient: 'from-violet-600 to-purple-500', light: 'bg-violet-50 border-violet-100',
   },
   {
+    href: '/shearwall', icon: Wallpaper, title: '剪力墙', code: 'Q',
+    desc: '竖向/水平分布筋、约束边缘构件、YBZ/GBZ构造',
+    tags: ['竖向分布筋', '水平分布筋', '约束边缘构件', 'YBZ'],
+    gradient: 'from-rose-600 to-pink-500', light: 'bg-rose-50 border-rose-100',
+  },
+  {
     href: '/slab', icon: LayoutGrid, title: '板', code: 'LB',
     desc: '底筋、面筋、分布筋双向配筋可视化',
     tags: ['X/Y向底筋', '面筋', '分布筋', '板厚'],
@@ -210,7 +216,7 @@ const COMPONENTS = [
 ];
 
 const STATS = [
-  { value: 4, suffix: '种', label: '构件类型' },
+  { value: 5, suffix: '种', label: '构件类型' },
   { value: 22, suffix: 'G101', label: '图集标准' },
   { value: 3, suffix: '个', label: 'AI 模型接入' },
   { value: 100, suffix: '%', label: '免费开源' },

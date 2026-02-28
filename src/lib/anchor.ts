@@ -4,14 +4,14 @@
  */
 
 // 混凝土等级对应轴心抗拉强度设计值 ft (N/mm²)
-const FT: Record<string, number> = {
+export const FT: Record<string, number> = {
   C20: 1.10, C25: 1.27, C30: 1.43, C35: 1.57,
   C40: 1.71, C45: 1.80, C50: 1.89, C55: 1.96,
   C60: 2.04,
 };
 
 // 钢筋等级对应抗拉强度设计值 fy (N/mm²)
-const FY: Record<string, number> = {
+export const FY: Record<string, number> = {
   A: 270,  // HPB300
   B: 300,  // HRB335
   C: 360,  // HRB400
@@ -142,7 +142,8 @@ export function calcBeamEndAnchor(
   const availableDepth = hc - cover; // 柱内可用锚固深度
   const canStraight = laE <= availableDepth;
   const straightLen = Math.max(laE, Math.ceil(0.5 * hc + 5 * diameter));
-  const bentStraightPart = Math.max(Math.ceil(0.4 * laE), Math.ceil(0.5 * hc + 5 * diameter));
+  // 22G101: 弯锚直段伸至柱对侧纵筋内侧 ≈ hc-cover，且 ≥ 0.4laE
+  const bentStraightPart = Math.max(Math.ceil(0.4 * laE), hc - cover);
   const bentBendPart = 15 * diameter;
 
   return { canStraight, straightLen, bentStraightPart, bentBendPart, laE, hc };

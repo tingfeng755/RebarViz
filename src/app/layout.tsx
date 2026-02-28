@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist } from 'next/font/google';
 import './globals.css';
-import { Header } from '@/components/Header';
+import { Header, MobileBottomNav } from '@/components/Header';
 
 const geist = Geist({ variable: '--font-geist', subsets: ['latin'] });
 
@@ -15,9 +15,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
-      <body className={`${geist.variable} font-sans antialiased bg-white text-gray-800`}>
+        <body className={`${geist.variable} font-sans antialiased bg-gray-50 text-gray-800`}>
         <Header />
-        {children}
+        <div className="pb-14 sm:pb-0">
+          {children}
+        </div>
+        <MobileBottomNav />
       </body>
     </html>
   );

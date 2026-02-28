@@ -1,8 +1,8 @@
 /**
  * Build context strings from component params for AI assistant
  */
-import type { BeamParams, ColumnParams, SlabParams, JointParams } from './types';
-import { parseRebar, parseStirrup, gradeLabel } from './rebar';
+import type { BeamParams, ColumnParams, SlabParams, JointParams, ShearWallParams } from './types';
+import { parseRebar, parseStirrup, parseSlabRebar, gradeLabel } from './rebar';
 
 export function buildBeamContext(p: BeamParams): string {
   const topR = parseRebar(p.top);
@@ -15,8 +15,9 @@ export function buildBeamContext(p: BeamParams): string {
 箍筋: ${p.stirrup} (${gradeLabel(stir.grade)} Φ${stir.diameter} 加密${stir.spacingDense}/非加密${stir.spacingNormal} ${stir.legs}肢箍)
 左支座负筋: ${p.leftSupport || '无'}
 右支座负筋: ${p.rightSupport || '无'}
+腰筋/抗扭筋: ${p.sideBar || '无'}${p.sideBar ? `，拉筋: ${p.tieBar || '自动(b≤350→A6)'}` : ''}
 混凝土等级: ${p.concreteGrade}，抗震等级: ${p.seismicGrade}
-保护层: ${p.cover}mm，梁净跨: ${p.spanLength}mm，柱宽 hc: ${p.hc}mm`;
+保护层: ${p.cover}mm，梁净跨: ${p.spanLength}mm，柱宽 hc: ${p.hc}mm${p.haunchType && p.haunchType !== 'none' ? `\n加腋: ${p.haunchType === 'horizontal' ? '水平' : '竖向'}加腋，c₁=${p.haunchLength}mm，${p.haunchType === 'horizontal' ? '高度' : '宽度'}=${p.haunchHeight}mm，${p.haunchSide === 'both' ? '两端' : p.haunchSide === 'left' ? '左端' : '右端'}` : ''}`;
 }
 
 export function buildColumnContext(p: ColumnParams): string {
@@ -46,6 +47,20 @@ export function buildJointContext(p: JointParams): string {
 梁截面: ${p.beamB}×${p.beamH}mm
 梁上部筋: ${p.beamTop}，梁下部筋: ${p.beamBottom}
 锚固方式: ${p.anchorType === 'bent' ? '弯锚' : '直锚'}
+混凝土等级: ${p.concreteGrade}，抗震等级: ${p.seismicGrade}
+保护层: ${p.cover}mm`;
+}
+
+export function buildShearWallContext(p: ShearWallParams): string {
+  const vert = parseSlabRebar(p.vertBar);
+  const horiz = parseSlabRebar(p.horizBar);
+  const boundaryR = parseRebar(p.boundaryMain);
+  return `构件类型: 剪力墙 ${p.id}
+墙厚 bw: ${p.bw}mm，墙长 lw: ${p.lw}mm，墙净高 hw: ${p.hw}mm
+竖向分布筋: ${p.vertBar} (${gradeLabel(vert.grade)} Φ${vert.diameter}@${vert.spacing}，双排)
+水平分布筋: ${p.horizBar} (${gradeLabel(horiz.grade)} Φ${horiz.diameter}@${horiz.spacing}，双排)
+约束边缘构件纵筋: ${p.boundaryMain} (${boundaryR.count}根 ${gradeLabel(boundaryR.grade)} Φ${boundaryR.diameter}，两端各一组)
+约束边缘构件箍筋: ${p.boundaryStirrup}
 混凝土等级: ${p.concreteGrade}，抗震等级: ${p.seismicGrade}
 保护层: ${p.cover}mm`;
 }
