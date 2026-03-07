@@ -1,8 +1,8 @@
-# RebarViz · 钢筋平法识图 3D 可视化
+# RebarViz · 鹏哥的钢筋日常
 
 > 基于 22G101 图集的钢筋平法学习工具，输入平法标注即时生成三维配筋模型。
 
-🌐 **在线体验**: [https://brucelee1024.github.io/RebarViz](https://brucelee1024.github.io/RebarViz)
+🌐 **在线体验**: [[https://brucelee1024.github.io/RebarViz](https://tingfeng755.github.io/RebarViz)](https://brucelee1024.github.io/RebarViz)
 
 ---
 
