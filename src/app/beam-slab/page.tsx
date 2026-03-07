@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-// 注意看下面这行！我们把 ./ 改成了 ../beam/ ，意思是去隔壁借用引擎！
-import { BeamPageClient } from '../beam/BeamPageClient';
+// 引入我们刚刚造好的专属控制台！
+import { BeamSlabPageClient } from './BeamSlabPageClient';
 
 export const metadata: Metadata = {
   title: '梁板节点 - 3D 配筋可视化 | RebarViz',
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function BeamSlabPage() {
   return (
     <Suspense>
-      <BeamPageClient />
+      <BeamSlabPageClient />
     </Suspense>
   );
 }
