@@ -1,20 +1,17 @@
-import React from 'react';
+import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { BeamPageClient } from './BeamPageClient';
 
-export default function BeamSlabJointPage() {
+export const metadata: Metadata = {
+  title: '梁平法识图 - 3D 配筋可视化 | RebarViz',
+  description: '在线学习框架梁(KL)平法标注，3D可视化查看上部通长筋、下部通长筋、箍筋加密区构造。支持自定义截面尺寸和配筋参数。',
+  keywords: '梁平法,KL,框架梁,上部通长筋,下部通长筋,箍筋加密区,22G101,配筋图',
+};
+
+export default function BeamSlabPage() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 text-slate-800">
-      <h1 className="text-5xl font-extrabold mb-6 text-blue-600">🚧 梁与板节点 3D 可视化</h1>
-      <p className="text-xl mb-4 font-medium">产品经理听风的全新需求！</p>
-      <p className="text-gray-500 mb-10">专属程序员正在疯狂计算板筋锚入梁内的 3D 坐标，核心算法排布中...</p>
-      
-      <div className="flex gap-4">
-        <a href="/beam" className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg font-bold hover:bg-gray-300 transition">
-          先看单根梁
-        </a>
-        <a href="/" className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition shadow-lg">
-          返回主控制台
-        </a>
-      </div>
-    </div>
+    <Suspense>
+      <BeamPageClient />
+    </Suspense>
   );
 }
