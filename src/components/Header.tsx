@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Box, Columns3, LayoutGrid, GitMerge, Menu, X, Wallpaper } from 'lucide-react';
+import { Box, Columns3, LayoutGrid, GitMerge, Menu, X, Wallpaper, Layers } from 'lucide-react';
 
 const NAV = [
   { href: '/beam', label: '梁 KL', icon: Columns3 },
@@ -11,9 +11,8 @@ const NAV = [
   { href: '/shearwall', label: '墙 Q', icon: Wallpaper },
   { href: '/slab', label: '板 LB', icon: LayoutGrid },
   { href: '/joint', label: '节点', icon: GitMerge },
+  { href: '/beam-slab', label: '梁板节点', icon: Layers }
 ];
-{ href: '/joint', label: '节点', icon: ... },
-  { href: '/beam-slab', label: '梁板节点', icon: Layers }, // <- 这是你加的新行！
 
 export function Header() {
   const pathname = usePathname();
