@@ -288,6 +288,7 @@ export function LandingPage() {
                 了解更多
                 <ChevronDown className="w-5 h-5" />
               </a>
+              <a href="/beam-slab" className="px-4 py-2 bg-indigo-500 text-white rounded mt-4 inline-block hover:bg-indigo-600">查看全新功能：梁板节点</a>
             </div>
           </Reveal>
         </div>
