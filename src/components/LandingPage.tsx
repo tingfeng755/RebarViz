@@ -252,7 +252,7 @@ export function LandingPage() {
           <Reveal delay={100}>
             <h1 className="text-6xl sm:text-8xl lg:text-9xl font-black tracking-tighter leading-[0.95] mb-8">
               <span className="block bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-gray-500">
-                钢筋平法识图
+                鹏哥钢筋课程之
               </span>
               <span className="block bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-500 mt-2">
                 3D 可视化学习
