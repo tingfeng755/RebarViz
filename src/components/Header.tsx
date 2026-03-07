@@ -12,6 +12,8 @@ const NAV = [
   { href: '/slab', label: '板 LB', icon: LayoutGrid },
   { href: '/joint', label: '节点', icon: GitMerge },
 ];
+{ href: '/joint', label: '节点', icon: ... },
+  { href: '/beam-slab', label: '梁板节点', icon: Layers }, // <- 这是你加的新行！
 
 export function Header() {
   const pathname = usePathname();
