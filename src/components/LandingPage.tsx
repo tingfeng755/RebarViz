@@ -213,6 +213,12 @@ const COMPONENTS = [
     tags: ['弯锚', '直锚', '节点区箍筋', '中间/边节点'],
     gradient: 'from-orange-600 to-amber-500', light: 'bg-orange-50 border-orange-100',
   },
+  {
+    href: '/beam-slab', icon: Layers, title: '梁板节点', code: 'VIP',
+    desc: '听风老板专属定制：梁板交接处 3D 核心构造详解',
+    tags: ['板底筋', '板面筋', '锚入梁内', '专属功能'],
+    gradient: 'from-pink-600 to-rose-500', light: 'bg-pink-50 border-pink-100',
+  },
 ];
 
 const STATS = [
