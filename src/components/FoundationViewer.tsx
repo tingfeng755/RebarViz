@@ -4,14 +4,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 
-/** 🚀 22G101-1 锚固参数矩阵 */
+/** 22G101-1 算量矩阵 */
 const LAB_MAP = { 'C25': 40, 'C30': 35, 'C35': 31, 'C40': 29, 'C45': 26, 'C50': 24 };
 const ZETA_AE_MAP = { '一级': 1.15, '二级': 1.15, '三级': 1.05, '四级': 1.0, '非抗震': 1.0 };
 
-/** 🌟 样条平滑钢筋组件：渲染 22G101 构造弯折 */
+/** CNC 级平滑钢筋组件 */
 function SmoothRebar({ points, radius, color }) {
   const curve = useMemo(() => new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.5), [points]);
   return (
@@ -22,7 +22,7 @@ function SmoothRebar({ points, radius, color }) {
   );
 }
 
-/** 🚧 3D 渲染核心 */
+/** 3D 渲染引擎 */
 function FoundationScene({ config, onSelect }) {
   const scale = 0.001; 
   const { 
@@ -32,31 +32,30 @@ function FoundationScene({ config, onSelect }) {
     concGrade, seismicGrade 
   } = config;
 
-  // --- 22G101 核心大脑计算 ---
+  // --- 22G101 算量逻辑 ---
   const lab_factor = LAB_MAP[concGrade] || 35;
   const zeta_ae = ZETA_AE_MAP[seismicGrade] || 1.0;
   const lae_val = Math.ceil(lab_factor * zeta_ae * colD); 
   const bend_mm = Math.max(6 * colD, 150);
 
   const fL = foundL * scale; const fB = foundB * scale; const fH = foundH * scale; const c = cover * scale;
-  const cB = colB * scale; const cH = colH * scale; const cD = colD * scale; const rCol = cD / 2;
-  const fD = foundD * scale; const rFound = fD / 2;
+  const cB = colB * scale; const cH = colH * scale; const cD = colD * scale;
   
-  const meshBottomY = -fH + c + rFound;
-  const meshTopY = -fH + c + fD + rFound;
+  const meshBottomY = -fH + c + (foundD * scale) / 2;
+  const meshTopY = meshBottomY + (foundD * scale);
   const topMeshY = -c - (topD * scale) / 2;
-  const bottomY = meshTopY + rFound;
+  const bottomY = meshTopY + (foundD * scale) / 2;
   const bendR = colD * 2.5 * scale;
 
-  // 1. 底板双向钢筋网排布 (铺满 L x B)
-  const gridX = useMemo(() => {
-    const countZ = Math.max(2, Math.floor((foundB - 2 * cover) / foundSpacing) + 1);
-    return Array.from({ length: countZ }, (_, i) => -fB/2 + c + i * ((foundB - 2 * cover) / (countZ - 1)));
+  // 1. 🚀 修正：底板双向网格生成 (X & Z)
+  const gridBottomX = useMemo(() => {
+    const count = Math.max(2, Math.floor((foundB - 2 * cover) / foundSpacing) + 1);
+    return Array.from({ length: count }, (_, i) => -fB/2 + c + i * ((foundB - 2 * cover) / (count - 1)));
   }, [foundB, cover, foundSpacing]);
 
-  const gridZ = useMemo(() => {
-    const countX = Math.max(2, Math.floor((foundL - 2 * cover) / foundSpacing) + 1);
-    return Array.from({ length: countX }, (_, i) => -fL/2 + c + i * ((foundL - 2 * cover) / (countX - 1)));
+  const gridBottomZ = useMemo(() => {
+    const count = Math.max(2, Math.floor((foundL - 2 * cover) / foundSpacing) + 1);
+    return Array.from({ length: count }, (_, i) => -fL/2 + c + i * ((foundL - 2 * cover) / (count - 1)));
   }, [foundL, cover, foundSpacing]);
 
   // 2. 柱纵筋矩阵 (nx * nz)
@@ -86,27 +85,24 @@ function FoundationScene({ config, onSelect }) {
 
   return (
     <group position={[0, fH/2, 0]}>
-      {/* 基础混凝土模型 */}
-      <mesh position={[0, -fH/2, 0]}>
-        <boxGeometry args={[fL, fH, fB]} />
-        <meshStandardMaterial color="#38bdf8" transparent opacity={0.12} depthWrite={false} />
-      </mesh>
+      {/* 混凝土 */}
+      <mesh position={[0, -fH/2, 0]}><boxGeometry args={[fL, fH, fB]} /><meshStandardMaterial color="#38bdf8" transparent opacity={0.12} depthWrite={false} /></mesh>
 
-      {/* 🔵 底板双向网片 (底层+上层) */}
+      {/* 🔵 底筋双向网网 (底层+上层) */}
       <group>
-        {gridX.map((z, i) => (
-          <mesh key={`bx-${i}`} position={[0, meshBottomY, z]} rotation={[0, 0, Math.PI/2]}>
-            <cylinderGeometry args={[rFound, rFound, fL - 2*c, 8]} /><meshStandardMaterial color="#2563eb" />
+        {gridBottomX.map((z, i) => (
+          <mesh key={`fbx-${i}`} position={[0, meshBottomY, z]} rotation={[0, 0, Math.PI/2]}>
+            <cylinderGeometry args={[(foundD * scale)/2, (foundD * scale)/2, fL - 2*c, 8]} /><meshStandardMaterial color="#2563eb" />
           </mesh>
         ))}
-        {gridZ.map((x, i) => (
-          <mesh key={`bz-${i}`} position={[x, meshTopY, 0]} rotation={[Math.PI/2, 0, 0]}>
-            <cylinderGeometry args={[rFound, rFound, fB - 2*c, 8]} /><meshStandardMaterial color="#3b82f6" />
+        {gridBottomZ.map((x, i) => (
+          <mesh key={`fbz-${i}`} position={[x, meshTopY, 0]} rotation={[Math.PI/2, 0, 0]}>
+            <cylinderGeometry args={[(foundD * scale)/2, (foundD * scale)/2, fB - 2*c, 8]} /><meshStandardMaterial color="#3b82f6" />
           </mesh>
         ))}
       </group>
 
-      {/* 🟣 顶部面筋网 (可选) */}
+      {/* 🟣 面筋双向网 (勾选后显示) */}
       {hasTopRebar && (
         <group>
           {Array.from({ length: Math.floor((foundB - 2 * cover) / topSpacing) + 1 }).map((_, i) => (
@@ -122,7 +118,7 @@ function FoundationScene({ config, onSelect }) {
         </group>
       )}
 
-      {/* 🔴 柱纵筋插筋 */}
+      {/* 🔴 柱插筋 */}
       <group>
         {colRebars.map(rb => (
           <group key={rb.id} onClick={(e) => { e.stopPropagation(); onSelect({
@@ -131,7 +127,7 @@ function FoundationScene({ config, onSelect }) {
             calcValue: `${lae_val}mm`,
             desc: `22G101 规定：弯折长度 max(6d, 150)=${bend_mm}mm。`, color: 'bg-red-600'
           })}}>
-            <SmoothRebar points={rb.pts} radius={rCol} color="#dc2626" />
+            <SmoothRebar points={rb.pts} radius={cD/2} color="#dc2626" />
           </group>
         ))}
       </group>
@@ -152,24 +148,18 @@ export default function FoundationViewer() {
 
   return (
     <div className="flex flex-col lg:flex-row w-full h-screen bg-white overflow-hidden">
-      {/* 左侧画布 */}
       <div className="flex-1 relative bg-slate-50">
-        <div className="absolute top-6 left-6 z-10">
-          <h1 className="text-xl font-black text-slate-800 italic">Independent Foundation <span className="text-blue-600">DJ</span></h1>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">22G101 Visual Lab 4.0</p>
-        </div>
-
+        <div className="absolute top-6 left-6 z-10"><h1 className="text-xl font-black text-slate-800 italic">22G101 独立基础 <span className="text-blue-600">DJ</span> 实验室</h1></div>
+        
         {selected && (
-          <div className="absolute top-6 right-6 z-50 w-72 bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-200 p-6 animate-in slide-in-from-right">
-             <div className="flex justify-between items-center mb-5"><h3 className="font-black text-slate-800">{selected.name}</h3><button onClick={() => setSelected(null)} className="text-slate-300">✕</button></div>
-             <div className="space-y-4">
-                <div className="bg-slate-900 rounded-2xl p-5 text-center shadow-xl">
-                   <p className="text-[10px] text-slate-500 uppercase mb-1 font-bold">22G101 Calculation</p>
-                   <p className="text-4xl font-black text-white font-mono tracking-tighter">{selected.calcValue}</p>
-                   <p className="text-[11px] text-blue-400 mt-2 font-mono italic">{selected.formula}</p>
-                </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed border-l-2 border-red-500 pl-3 italic">{selected.desc}</p>
+          <div className="absolute top-6 right-6 z-50 w-72 bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-200 p-6 animate-in slide-in-from-right">
+             <div className="flex justify-between items-center mb-5 font-black text-slate-800"><span>{selected.name}</span><button onClick={() => setSelected(null)}>✕</button></div>
+             <div className="bg-slate-900 rounded-2xl p-5 text-center text-white">
+                <p className="text-[10px] text-slate-500 uppercase mb-1">22G101 计算结果</p>
+                <p className="text-4xl font-black font-mono tracking-tighter">{selected.calcValue}</p>
+                <p className="text-[11px] text-blue-400 mt-2 font-mono italic">{selected.formula}</p>
              </div>
+             <p className="text-[11px] text-slate-500 mt-4 border-l-2 border-red-500 pl-3 italic">{selected.desc}</p>
           </div>
         )}
 
@@ -178,62 +168,50 @@ export default function FoundationViewer() {
             <Canvas camera={{ position: [3, 2, 4], fov: 35 }}>
               <ambientLight intensity={0.8} /><pointLight position={[10, 10, 10]} intensity={1.5} />
               <FoundationScene config={config} onSelect={setSelected} />
-              <Grid args={[12, 12]} cellColor="#cbd5e1" sectionColor="#94a3b8" fadeDistance={25} />
+              <Grid args={[12, 12]} cellColor="#cbd5e1" sectionColor="#94a3b8" />
               <OrbitControls makeDefault />
             </Canvas>
           )}
         </div>
       </div>
 
-      {/* 右侧控制台 (全参数选项卡) */}
-      <div className="w-full lg:w-96 bg-white p-8 shadow-2xl border-l border-slate-100 overflow-y-auto">
-        <div className="flex items-center gap-3 mb-8"><div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg text-lg">📐</div><h3 className="font-black text-slate-800 text-xl tracking-tight italic">控制台</h3></div>
-
+      <div className="w-full lg:w-96 bg-white p-8 shadow-2xl border-l overflow-y-auto">
+        <h3 className="font-black text-slate-800 mb-8 border-b pb-4">📐 全参数化控制台</h3>
         <div className="space-y-8">
-          <section className="space-y-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1">1. 材料与抗震环境</p>
+          <section className="space-y-4">
+            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded inline-block">1. 材料环境</p>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-400 ml-1">混凝土强度</label>
-                <select value={config.concGrade} onChange={e => setConfig({...config, concGrade: e.target.value})} className="w-full p-2.5 bg-white border border-slate-100 rounded-xl text-sm font-bold shadow-sm outline-none focus:ring-2 focus:ring-indigo-500">
+              <div className="space-y-1"><label className="text-[11px] font-bold text-slate-400">混凝土强度</label>
+                <select value={config.concGrade} onChange={e => setConfig({...config, concGrade: e.target.value})} className="w-full p-2.5 bg-slate-50 border-none rounded-xl text-sm font-bold">
                   {Object.keys(LAB_MAP).map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
-              <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-400 ml-1">抗震等级</label>
-                <select value={config.seismicGrade} onChange={e => setConfig({...config, seismicGrade: e.target.value})} className="w-full p-2.5 bg-white border border-slate-100 rounded-xl text-sm font-bold shadow-sm outline-none focus:ring-2 focus:ring-indigo-500">
+              <div className="space-y-1"><label className="text-[11px] font-bold text-slate-400">抗震等级</label>
+                <select value={config.seismicGrade} onChange={e => setConfig({...config, seismicGrade: e.target.value})} className="w-full p-2.5 bg-slate-50 border-none rounded-xl text-sm font-bold">
                   {Object.keys(ZETA_AE_MAP).map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
             </div>
           </section>
 
-          <section className="space-y-4">
-            <p className="text-[10px] font-black text-red-600 uppercase tracking-widest px-1">2. 柱参数及排布 (nx × nz)</p>
+          <section className="space-y-4 pt-4 border-t">
+            <p className="text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50 px-2 py-1 rounded inline-block">2. 柱筋排布 (nx × nz)</p>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-400">柱截面 b (mm)</label><input type="number" value={config.colB} onChange={e => setConfig({...config, colB: Number(e.target.value)})} className="w-full p-2.5 bg-slate-50 border-none rounded-xl text-sm font-mono font-bold" /></div>
-              <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-400">柱截面 h (mm)</label><input type="number" value={config.colH} onChange={e => setConfig({...config, colH: Number(e.target.value)})} className="w-full p-2.5 bg-slate-50 border-none rounded-xl text-sm font-mono font-bold" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-400">X 向根数</label><input type="range" min="2" max="10" value={config.nx} onChange={e => setConfig({...config, nx: parseInt(e.target.value)})} className="w-full accent-red-600" /><div className="text-right text-[10px] font-bold text-red-600">{config.nx} 根</div></div>
-              <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-400">Z 向根数</label><input type="range" min="2" max="10" value={config.nz} onChange={e => setConfig({...config, nz: parseInt(e.target.value)})} className="w-full accent-red-600" /><div className="text-right text-[10px] font-bold text-red-600">{config.nz} 根</div></div>
+              <div><label className="text-[11px] text-slate-400">X 向根数</label><input type="range" min="2" max="10" value={config.nx} onChange={e => setConfig({...config, nx: parseInt(e.target.value)})} className="w-full accent-red-600" /><div className="text-right text-xs font-bold text-red-600">{config.nx} 根</div></div>
+              <div><label className="text-[11px] text-slate-400">Z 向根数</label><input type="range" min="2" max="10" value={config.nz} onChange={e => setConfig({...config, nz: parseInt(e.target.value)})} className="w-full accent-red-600" /><div className="text-right text-xs font-bold text-red-600">{config.nz} 根</div></div>
             </div>
           </section>
 
-          <section className="space-y-4 border-t pt-6">
-            <div className="flex justify-between items-center"><p className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">3. 基础及配筋参数</p></div>
+          <section className="space-y-4 pt-4 border-t">
+            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-1 rounded inline-block">3. 基础及底筋/面筋</p>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-400">基础边长 L</label><input type="number" value={config.foundL} onChange={e => setConfig({...config, foundL: Number(e.target.value)})} className="w-full p-2.5 bg-slate-50 border-none rounded-xl text-sm font-mono font-bold" /></div>
-              <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-400">底筋间距 S</label><input type="number" value={config.foundSpacing} onChange={e => setConfig({...config, foundSpacing: Number(e.target.value)})} className="w-full p-2.5 bg-slate-50 border-none rounded-xl text-sm font-mono font-bold" /></div>
+              <div className="space-y-1"><label className="text-[11px] text-slate-400">基础长度 L</label><input type="number" value={config.foundL} onChange={e => setConfig({...config, foundL: Number(e.target.value)})} className="w-full p-2.5 bg-slate-50 rounded-xl text-sm font-bold" /></div>
+              <div className="space-y-1"><label className="text-[11px] text-slate-400">底筋间距 S</label><input type="number" value={config.foundSpacing} onChange={e => setConfig({...config, foundSpacing: Number(e.target.value)})} className="w-full p-2.5 bg-slate-50 rounded-xl text-sm font-bold" /></div>
             </div>
-            <div className="flex items-center justify-between bg-purple-50 p-3 rounded-xl border border-purple-100">
-               <label className="text-[11px] font-bold text-purple-600 uppercase tracking-widest">开启顶部双向面筋</label>
-               <input type="checkbox" checked={config.hasTopRebar} onChange={e => setConfig({...config, hasTopRebar: e.target.checked})} className="w-4 h-4 rounded accent-purple-600" />
+            <div className="flex items-center justify-between p-3 bg-purple-50 rounded-xl">
+               <span className="text-[11px] font-bold text-purple-600 uppercase">开启顶部双向面筋</span>
+               <input type="checkbox" checked={config.hasTopRebar} onChange={e => setConfig({...config, hasTopRebar: e.target.checked})} className="accent-purple-600" />
             </div>
-            {config.hasTopRebar && (
-              <div className="grid grid-cols-2 gap-4 animate-in fade-in">
-                <div className="space-y-1.5"><label className="text-[11px] font-bold text-purple-400">面筋 Φ</label><input type="number" value={config.topD} onChange={e => setConfig({...config, topD: Number(e.target.value)})} className="w-full p-2.5 bg-white border border-purple-100 rounded-xl text-sm font-mono" /></div>
-                <div className="space-y-1.5"><label className="text-[11px] font-bold text-purple-400">面筋间距</label><input type="number" value={config.topSpacing} onChange={e => setConfig({...config, topSpacing: Number(e.target.value)})} className="w-full p-2.5 bg-white border border-purple-100 rounded-xl text-sm font-mono" /></div>
-              </div>
-            )}
           </section>
         </div>
       </div>
