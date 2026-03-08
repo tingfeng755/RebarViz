@@ -7,13 +7,14 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 🚀 听风专属：柔性曲线管道渲染器（专治钢筋断裂）
+// 🚀 听风专属：CNC 级精密柔性曲线管道（真·无缝钢筋）
 function TubePath({ points, radius, color }) {
-  // 使用 CatmullRomCurve3 将点连成平滑的 3D 曲线
-  const curve = useMemo(() => new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.2), [points]);
+  // 使用 centripetal 类型防止曲线打结，点数给够就能完美圆滑
+  const curve = useMemo(() => new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.5), [points]);
   return (
     <mesh>
-      <tubeGeometry args={[curve, 64, radius, 8, false]} />
+      {/* 提升了管壁圆滑度，参数为 [曲线, 管道分段数, 半径, 圆周分段数, 是否闭合] */}
+      <tubeGeometry args={[curve, 64, radius, 12, false]} />
       <meshStandardMaterial color={color} roughness={0.4} metalness={0.6} />
     </mesh>
   );
@@ -39,7 +40,7 @@ function FoundationScene({ config, onSelect }) {
   const bendLength_mm = Math.max(6 * config.colD, 150);
   const bendL = bendLength_mm * scale;
 
-  // 弯曲半径（通常取 2.5d）
+  // 弯曲圆弧半径（通常取 2.5d）
   const bendR = config.colD * 2.5 * scale;
 
   const colRebarPos = [
@@ -79,18 +80,31 @@ function FoundationScene({ config, onSelect }) {
 
       <group>
         {colRebarPos.map((pos, i) => {
-          // 将弯折方向单位化，保证弯折长度准确
           const mag = Math.hypot(pos.dirX, pos.dirZ) || 1;
           const dx = pos.dirX / mag;
           const dz = pos.dirZ / mag;
           
-          // 核心算法：定义一根连续钢筋的 4 个关键转折点
-          const pts = [
-            new THREE.Vector3(pos.x, topY, pos.z), // 顶部高点
-            new THREE.Vector3(pos.x, bottomY + bendR, pos.z), // 开始下弯点
-            new THREE.Vector3(pos.x + bendR * dx, bottomY, pos.z + bendR * dz), // 弯曲圆弧过度点
-            new THREE.Vector3(pos.x + bendL * dx, bottomY, pos.z + bendL * dz) // 弯折末端点
-          ];
+          const pts = [];
+          
+          // 1. 直段顶部最高点
+          pts.push(new THREE.Vector3(pos.x, topY, pos.z));
+          
+          // 2. 🔴 核心修复：用三角函数切分 15 个点，强制画出完美的四分之一圆弧
+          const arcSegments = 15;
+          const cx = pos.x + bendR * dx;
+          const cy = bottomY + bendR;
+          const cz = pos.z + bendR * dz;
+          
+          for (let j = 0; j <= arcSegments; j++) {
+            const theta = (j / arcSegments) * (Math.PI / 2);
+            const px = cx - bendR * dx * Math.cos(theta);
+            const py = cy - bendR * Math.sin(theta);
+            const pz = cz - bendR * dz * Math.cos(theta);
+            pts.push(new THREE.Vector3(px, py, pz));
+          }
+          
+          // 3. 底部向外延伸的锚固终点
+          pts.push(new THREE.Vector3(pos.x + bendL * dx, bottomY, pos.z + bendL * dz));
 
           return (
             <group 
@@ -102,7 +116,6 @@ function FoundationScene({ config, onSelect }) {
               })}
               {...cursorProps}
             >
-              {/* 用管道算法一笔画出平滑钢筋，告别断裂！ */}
               <TubePath points={pts} radius={r} color="#dc2626" />
             </group>
           );
@@ -149,7 +162,7 @@ export default function FoundationViewer() {
     <div className="flex flex-col lg:flex-row w-full h-full min-h-[80vh] bg-slate-50 relative">
       <div className="flex-1 relative border-r border-slate-200" style={{ minHeight: '600px' }}>
         <div className="absolute top-4 left-4 z-10 bg-indigo-600 text-white px-4 py-2 rounded shadow-md font-bold cursor-pointer hover:bg-indigo-700">
-          ✅ 独立基础：平滑弯曲 3D 引擎注入成功！
+          ✅ 独立基础：完美圆弧 CNC 算法已激活！
         </div>
 
         {selectedRebar && (
