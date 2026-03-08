@@ -19,6 +19,7 @@ const LAB_MAP = {
 const REBAR_GRADES = Object.keys(LAB_MAP);
 const Z_MAP = { '一级': 1.15, '二级': 1.15, '三级': 1.05, '四级': 1.0, '非抗震': 1.0 };
 
+// 顺滑折弯钢筋组件
 function SmoothBar({ points, radius, color }) {
   const curve = useMemo(() => new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.5), [points]);
   return (
@@ -36,6 +37,7 @@ function JointScene({ config, onSelect }) {
   const conc = config.conc || 'C30';
   const seismic = config.seismic || '二级';
   const c = Number(config.cover) || 20; 
+  const isEdge = Boolean(config.isEdge); // 🚀 边节点开关
   
   const bB = Number(config.beamB) || 250;
   const bH = Number(config.beamH) || 500;
@@ -52,109 +54,157 @@ function JointScene({ config, onSelect }) {
   const sbDy = Number(config.slabBotDy) || 10;
   const sbSy = Math.max(50, Number(config.slabBotSy) || 200);
 
+  const hasTop = Boolean(config.hasTop);
+  const stDx = Number(config.slabTopDx) || 8;
+  const stSx = Math.max(50, Number(config.slabTopSx) || 200);
+  const stDy = Number(config.slabTopDy) || 8;
+  const stSy = Math.max(50, Number(config.slabTopSy) || 200);
+
   const beamTopY = 0;
   const beamBotY = -bH * s;
   const slabBotY = -sH * s;
 
+  // ==== 梁钢筋矩阵 ====
   const beamTopY_rebar = beamTopY - c*s - tD*s/2;
   const beamBotY_rebar = beamBotY + c*s + botD*s/2;
 
-  const beamTopBars = useMemo(() => {
-    return Array.from({length: tN}, (_, i) => {
-      const x = -bB*s/2 + c*s + tD*s/2 + i * ((bB*s - 2*c*s - tD*s)/(tN-1));
-      return { pts: [new THREE.Vector3(x, beamTopY_rebar, -L*s/2), new THREE.Vector3(x, beamTopY_rebar, L*s/2)], id: `bt-${i}` };
-    });
-  }, [bB, tD, tN, c, beamTopY_rebar]);
+  const beamTopBars = useMemo(() => Array.from({length: tN}, (_, i) => {
+    const x = -bB*s/2 + c*s + tD*s/2 + i * ((bB*s - 2*c*s - tD*s)/(tN-1));
+    return { pts: [new THREE.Vector3(x, beamTopY_rebar, -L*s/2), new THREE.Vector3(x, beamTopY_rebar, L*s/2)], id: `bt-${i}` };
+  }), [bB, tD, tN, c, beamTopY_rebar]);
 
-  const beamBotBars = useMemo(() => {
-    return Array.from({length: botN}, (_, i) => {
-      const x = -bB*s/2 + c*s + botD*s/2 + i * ((bB*s - 2*c*s - botD*s)/(botN-1));
-      return { pts: [new THREE.Vector3(x, beamBotY_rebar, -L*s/2), new THREE.Vector3(x, beamBotY_rebar, L*s/2)], id: `bb-${i}` };
-    });
-  }, [bB, botD, botN, c, beamBotY_rebar]);
+  const beamBotBars = useMemo(() => Array.from({length: botN}, (_, i) => {
+    const x = -bB*s/2 + c*s + botD*s/2 + i * ((bB*s - 2*c*s - botD*s)/(botN-1));
+    return { pts: [new THREE.Vector3(x, beamBotY_rebar, -L*s/2), new THREE.Vector3(x, beamBotY_rebar, L*s/2)], id: `bb-${i}` };
+  }), [bB, botD, botN, c, beamBotY_rebar]);
 
-  const stirrups = useMemo(() => {
-    const n = Math.floor(L / stirrupS) + 1;
-    return Array.from({length: n}, (_, i) => -L*s/2 + i * (stirrupS * s));
-  }, [L, stirrupS]);
+  const stirrups = useMemo(() => Array.from({length: Math.floor(L / stirrupS) + 1}, (_, i) => -L*s/2 + i * (stirrupS * s)), [L, stirrupS]);
 
+  // ==== 板钢筋矩阵 ====
+  const slabW = isEdge ? (1500*s + bB*s/2) : 2000*s;
+  const slabPosX = isEdge ? (1500*s - bB*s/2)/2 : 0;
+  
   const slabBotY_X = slabBotY + c*s + sbDx*s/2;
   const slabBotY_Z = slabBotY_X + sbDx*s/2 + sbDy*s/2;
+  const slabTopY_X = beamTopY - c*s - stDx*s/2; 
+  const slabTopY_Z = slabTopY_X - stDx*s/2 - stDy*s/2;
 
-  const slabGridX = useMemo(() => { 
-    const w = 2000; 
-    const n = Math.floor(w / sbSx) + 1;
-    return Array.from({length: n}, (_, i) => -w*s/2 + i*(sbSx*s));
-  }, [sbSx]);
+  // 🔵 垂直梁的底筋 (如果边节点，伸入梁并向上弯折)
+  const slabBotBarsX = useMemo(() => {
+    const startX = isEdge ? 1500*s : 1000*s;
+    const endX = isEdge ? (-bB*s/2 + c*s + sbDx*s) : -1000*s;
+    const bendUp = isEdge ? 15 * sbDx * s : 0;
+    
+    return Array.from({length: Math.floor((L*s) / (sbSx*s)) + 1}, (_, i) => {
+      const z = -L*s/2 + i * (sbSx*s);
+      const pts = [
+        new THREE.Vector3(startX, slabBotY_X, z),
+        new THREE.Vector3((startX+endX)/2, slabBotY_X, z), // 保证平滑直线的基准点
+        new THREE.Vector3(endX, slabBotY_X, z)
+      ];
+      if (isEdge) pts.push(new THREE.Vector3(endX, slabBotY_X + bendUp, z));
+      return { pts, id: `sbx-${i}` };
+    });
+  }, [isEdge, bB, c, sbDx, sbSx, L, slabBotY_X]);
 
-  const slabGridZ = useMemo(() => { 
-    const n = Math.floor(L / sbSy) + 1;
-    return Array.from({length: n}, (_, i) => -L*s/2 + i*(sbSy*s));
-  }, [L, sbSy]);
+  // 🟣 垂直梁的面筋 (如果边节点，伸入梁并向下弯折)
+  const slabTopBarsX = useMemo(() => {
+    if(!hasTop) return [];
+    const startX = isEdge ? 1500*s : 1000*s;
+    const endX = isEdge ? (-bB*s/2 + c*s + stDx*s) : -1000*s;
+    const bendDown = isEdge ? 15 * stDx * s : 0;
 
+    return Array.from({length: Math.floor((L*s) / (stSx*s)) + 1}, (_, i) => {
+      const z = -L*s/2 + i * (stSx*s);
+      const pts = [
+        new THREE.Vector3(startX, slabTopY_X, z),
+        new THREE.Vector3((startX+endX)/2, slabTopY_X, z),
+        new THREE.Vector3(endX, slabTopY_X, z)
+      ];
+      if (isEdge) pts.push(new THREE.Vector3(endX, slabTopY_X - bendDown, z));
+      return { pts, id: `stx-${i}` };
+    });
+  }, [isEdge, hasTop, bB, c, stDx, stSx, L, slabTopY_X]);
+
+  // 平行梁的钢筋 (直接生成X轴阵列)
+  const slabBotGridZ = useMemo(() => {
+    const startX = isEdge ? (bB*s/2 + c*s) : -1000*s;
+    const span = 1500*s - startX;
+    const n = Math.max(2, Math.floor(span / (sbSy*s)) + 1);
+    return Array.from({length: n}, (_, i) => startX + i * (span/(n-1)));
+  }, [isEdge, bB, c, sbSy]);
+
+  const slabTopGridZ = useMemo(() => {
+    if(!hasTop) return [];
+    const startX = isEdge ? (bB*s/2 + c*s) : -1000*s;
+    const span = 1500*s - startX;
+    const n = Math.max(2, Math.floor(span / (stSy*s)) + 1);
+    return Array.from({length: n}, (_, i) => startX + i * (span/(n-1)));
+  }, [isEdge, hasTop, bB, c, stSy]);
+
+  // ==== 点击互动卡片事件 ====
   const handleBeamTopClick = (e) => {
     e.stopPropagation();
     const lab = LAB_MAP[config.beamTopGrade]?.[conc] || 35;
     const zeta = Z_MAP[seismic] || 1.0;
     const lae = Math.ceil(lab * zeta * tD);
     onSelect({
-      name: '框架梁 (KL) 通长纵筋',
-      spec: `${config.beamTopGrade} Φ${tD}`,
-      val: `laE = ${lae} mm`,
-      formula: `laE = ζaE × lab = ${zeta} × ${lab}d`,
+      name: '框架梁 (KL) 通长纵筋', spec: `${config.beamTopGrade} Φ${tD}`,
+      val: `laE = ${lae} mm`, formula: `laE = ζaE × lab = ${zeta} × ${lab}d`,
       desc: `22G101：框架梁纵筋基本锚固长度需乘以抗震锚固系数 ${zeta}。`
     });
   };
 
   const handleSlabBotClick = (e) => {
     e.stopPropagation();
-    const bend = Math.max(5 * sbDx, 50);
+    const bend = isEdge ? 15 * sbDx : Math.max(5 * sbDx, 50);
     onSelect({
-      name: '楼板 (LB) 底面受力筋',
+      name: isEdge ? '边节点 - 板底受力筋' : '中间支座 - 板底受力筋', 
       spec: `${config.slabBotGrade} Φ${sbDx}`,
-      val: `直锚 ≥ ${bend} mm`,
-      formula: `规范要求: max(5d, 伸至梁中心线)`,
-      desc: `22G101：板下部钢筋伸入支座的锚固长度不应小于 5d 且应越过支座中心线。`
+      val: isEdge ? `向上弯折 ${bend} mm` : `直锚 ≥ ${bend} mm`,
+      formula: isEdge ? `端支座构造: 伸至外侧向上弯折 15d` : `直锚要求: max(5d, 伸至支座中心线)`,
+      desc: isEdge ? `22G101：端支座直线锚固不足时，可伸至外侧钢筋内侧并向上弯折 15d。` : `22G101：板下部钢筋伸入中间支座锚固不应小于 5d 且越过中心线。`
+    });
+  };
+
+  const handleSlabTopClick = (e) => {
+    e.stopPropagation();
+    const bend = isEdge ? 15 * stDx : 0;
+    onSelect({
+      name: isEdge ? '边节点 - 板面负筋' : '中间支座 - 板面连通筋', 
+      spec: `${config.slabTopGrade} Φ${stDx}`,
+      val: isEdge ? `向下弯折 ${bend} mm` : `双向连通布置`,
+      formula: isEdge ? `端支座构造: 伸至外侧向下弯折 15d` : `中间支座: 连通不弯折`,
+      desc: isEdge ? `22G101：板面筋伸入端支座应满足水平段锚固，并在端部向下弯折 15d。` : `22G101：板面筋在中间支座连续通过。`
     });
   };
 
   return (
     <group position={[0, 0, 0]}>
+      {/* 梁板混凝土壳 */}
       <mesh position={[0, beamBotY/2, 0]}><boxGeometry args={[bB*s, bH*s, L*s]} /><meshStandardMaterial color="#94a3b8" transparent opacity={0.15} depthWrite={false}/></mesh>
-      <mesh position={[0, slabBotY/2, 0]}><boxGeometry args={[2000*s, sH*s, L*s]} /><meshStandardMaterial color="#38bdf8" transparent opacity={0.15} depthWrite={false}/></mesh>
+      <mesh position={[slabPosX, slabBotY/2, 0]}><boxGeometry args={[slabW, sH*s, L*s]} /><meshStandardMaterial color="#38bdf8" transparent opacity={0.15} depthWrite={false}/></mesh>
 
-      {beamTopBars.map(rb => (
-        <group key={rb.id} onClick={handleBeamTopClick}>
-          <SmoothBar points={rb.pts} radius={tD*s/2} color="#dc2626" />
-        </group>
-      ))}
-      {beamBotBars.map(rb => (
-        <group key={rb.id} onClick={handleBeamTopClick}>
-          <SmoothBar points={rb.pts} radius={botD*s/2} color="#ef4444" />
-        </group>
-      ))}
-
+      {/* 梁纵筋/箍筋 */}
+      {beamTopBars.map(rb => <group key={rb.id} onClick={handleBeamTopClick}><SmoothBar points={rb.pts} radius={tD*s/2} color="#dc2626" /></group>)}
+      {beamBotBars.map(rb => <group key={rb.id} onClick={handleBeamTopClick}><SmoothBar points={rb.pts} radius={botD*s/2} color="#ef4444" /></group>)}
       <group>
-        {stirrups.map((z, i) => (
-          <mesh key={`st-${i}`} position={[0, beamBotY/2, z]}>
-            <boxGeometry args={[(bB-2*c)*s, (bH-2*c)*s, stirrupD*s]} />
-            <meshStandardMaterial color="#22c55e" wireframe={true} />
-          </mesh>
-        ))}
+        {stirrups.map((z, i) => (<mesh key={`st-${i}`} position={[0, beamBotY/2, z]}><boxGeometry args={[(bB-2*c)*s, (bH-2*c)*s, stirrupD*s]} /><meshStandardMaterial color="#22c55e" wireframe={true} /></mesh>))}
       </group>
 
+      {/* 🔵 板底筋 */}
+      {slabBotBarsX.map(rb => <group key={rb.id} onClick={handleSlabBotClick}><SmoothBar points={rb.pts} radius={sbDx*s/2} color="#2563eb" /></group>)}
       <group onClick={handleSlabBotClick}>
-        {slabGridZ.map((z, i) => (
-          <mesh key={`sbx-${i}`} position={[0, slabBotY_X, z]} rotation={[0,0,Math.PI/2]}>
-            <cylinderGeometry args={[sbDx*s/2, sbDx*s/2, 2000*s, 8]} /><meshStandardMaterial color="#2563eb" />
-          </mesh>
-        ))}
-        {slabGridX.map((x, i) => (
-          <mesh key={`sbz-${i}`} position={[x, slabBotY_Z, 0]} rotation={[Math.PI/2,0,0]}>
-            <cylinderGeometry args={[sbDy*s/2, sbDy*s/2, L*s, 8]} /><meshStandardMaterial color="#3b82f6" />
-          </mesh>
-        ))}
+        {slabBotGridZ.map((x, i) => (<mesh key={`sbz-${i}`} position={[x, slabBotY_Z, 0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[sbDy*s/2, sbDy*s/2, L*s, 8]} /><meshStandardMaterial color="#3b82f6" /></mesh>))}
       </group>
+
+      {/* 🟣 恢复的面筋 */}
+      {hasTop && slabTopBarsX.map(rb => <group key={rb.id} onClick={handleSlabTopClick}><SmoothBar points={rb.pts} radius={stDx*s/2} color="#a855f7" /></group>)}
+      {hasTop && (
+        <group onClick={handleSlabTopClick}>
+          {slabTopGridZ.map((x, i) => (<mesh key={`stz-${i}`} position={[x, slabTopY_Z, 0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[stDy*s/2, stDy*s/2, L*s, 8]} /><meshStandardMaterial color="#c084fc" /></mesh>))}
+        </group>
+      )}
     </group>
   );
 }
@@ -164,7 +214,7 @@ export default function JointDetailsPage() {
   const [sel, setSel] = useState(null);
   
   const [cfg, setCfg] = useState({ 
-    conc:'C30', seismic:'二级', cover: 20,
+    conc:'C30', seismic:'二级', cover: 20, isEdge: false,
     beamB: 250, beamH: 500,
     beamTopGrade: 'HRB400', beamTopD: 20, beamTopN: 3,
     beamBotGrade: 'HRB400', beamBotD: 20, beamBotN: 3,
@@ -219,7 +269,7 @@ export default function JointDetailsPage() {
         </div>
       </div>
 
-      {/* ================= 右侧 展开版 控制台 ================= */}
+      {/* ================= 右侧 控制台 ================= */}
       <div className="w-full lg:w-[480px] bg-white border-l border-slate-200 shadow-2xl overflow-y-auto flex flex-col">
         <div className="p-5 bg-slate-900 text-white sticky top-0 z-20 shadow-md">
           <h3 className="font-black italic tracking-wider text-lg flex items-center gap-2"><Layers className="w-5 h-5"/> 节点参数控制台</h3>
@@ -300,11 +350,17 @@ export default function JointDetailsPage() {
                <h4 className="font-bold text-slate-800 text-sm">楼板 (LB) 配置</h4>
              </div>
              
+             {/* 🚀 边节点切换开关 */}
+             <div className="flex justify-between items-center bg-sky-50 p-3 rounded-xl border border-sky-100 shadow-sm">
+               <span className="text-[11px] font-black text-sky-700 uppercase tracking-widest">切换为板边缘节点 (边梁)</span>
+               <input type="checkbox" checked={cfg.isEdge} onChange={e=>handleChange('isEdge', e.target.checked)} className="w-4 h-4 accent-sky-600 cursor-pointer" />
+             </div>
+
              <div className="bg-blue-50/30 p-3 rounded-xl border border-blue-100 space-y-3">
                <div className="space-y-1"><label className="text-[11px] font-bold text-slate-500">板厚度 h (mm)</label><input type="number" value={cfg.slabH} onChange={e=>handleChange('slabH', e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-mono outline-none focus:border-blue-400" /></div>
              </div>
 
-             {/* 板底筋 - 完全展开 */}
+             {/* 板底筋 */}
              <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 space-y-3">
                <div className="flex justify-between items-center">
                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">板底受力筋</p>
@@ -325,7 +381,7 @@ export default function JointDetailsPage() {
                </div>
              </div>
 
-             {/* 板面筋 - 完全展开 */}
+             {/* 板面筋 */}
              <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100 space-y-3">
                <div className="flex justify-between items-center">
                  <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest">配置板面负筋</p>
