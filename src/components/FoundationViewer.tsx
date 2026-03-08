@@ -2,7 +2,7 @@
 /* eslint-disable */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
 import * as THREE from 'three';
@@ -117,6 +117,12 @@ function FoundationScene({ config, onSelect }) {
 export default function FoundationViewer() {
   const [activeTab, setActiveTab] = useState('column');
   const [selectedRebar, setSelectedRebar] = useState(null);
+  
+  // 🚀 核心修复：延迟加载状态机，防止服务器渲染 3D 引擎时崩溃
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [config, setConfig] = useState({
     foundL: 2000, foundB: 2000, foundH: 600,
@@ -134,7 +140,7 @@ export default function FoundationViewer() {
         </div>
 
         {selectedRebar && (
-          <div className="absolute top-16 right-4 z-20 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
+          <div className="absolute top-16 right-4 z-20 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300 z-50">
             <div className={`${selectedRebar.color} px-4 py-3 flex justify-between items-center text-white`}>
               <h3 className="font-bold text-md flex items-center gap-2"><span>🔍</span> {selectedRebar.name}</h3>
               <button onClick={() => setSelectedRebar(null)} className="hover:bg-black/20 rounded-full w-6 h-6 flex items-center justify-center transition-colors">✕</button>
@@ -168,15 +174,23 @@ export default function FoundationViewer() {
           </div>
         )}
         
+        {/* 只有在客户端加载完成后，才渲染 3D 引擎 */}
         <div className="w-full h-full bg-[#f8fafc]">
-          <Canvas camera={{ position: [3, 2, 4], fov: 45 }}>
-            <ambientLight intensity={0.6} />
-            <directionalLight position={[5, 8, 5]} intensity={0.8} castShadow />
-            <FoundationScene config={config} onSelect={setSelectedRebar} />
-            <Grid args={[10, 10]} position={[0, -0.01, 0]} cellColor="#E2E8F0" sectionColor="#E2E8F0" fadeDistance={15} />
-            <axesHelper args={[1.5]} />
-            <OrbitControls target={[0, 0.5, 0]} enableDamping dampingFactor={0.1} />
-          </Canvas>
+          {mounted ? (
+            <Canvas camera={{ position: [3, 2, 4], fov: 45 }}>
+              <ambientLight intensity={0.6} />
+              <directionalLight position={[5, 8, 5]} intensity={0.8} castShadow />
+              <FoundationScene config={config} onSelect={setSelectedRebar} />
+              <Grid args={[10, 10]} position={[0, -0.01, 0]} cellColor="#E2E8F0" sectionColor="#E2E8F0" fadeDistance={15} />
+              <axesHelper args={[1.5]} />
+              <OrbitControls target={[0, 0.5, 0]} enableDamping dampingFactor={0.1} />
+            </Canvas>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold">
+              🚀 3D 引擎预热中...
+            </div>
+          )}
+          
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-800/80 text-white text-[11px] px-4 py-1.5 rounded-full backdrop-blur-sm pointer-events-none shadow-lg">
             左键旋转 · 右键平移 · 滚轮缩放 · <span className="text-indigo-300 font-bold">点击钢筋查看规范</span>
           </div>
