@@ -7,8 +7,7 @@ import dynamic from 'next/dynamic';
 // 召唤开好后门的 3D 梁画笔
 const BeamViewer = dynamic(() => import('@/components/BeamViewer'), { ssr: false });
 
-// 🚧 听风专属：楼板与面筋 3D 坐标生成器 (通过 children 注入到梁的宇宙中)
-// 🚧 听风专属：楼板与面筋 3D 坐标生成器 (已修复单位缩放比例)
+// 🚧 听风专属：楼板与面筋 3D 坐标生成器 (已彻底修复单位缩放比例)
 function SlabInjectionMesh({ params }) {
   // 核心修复：原作者的 3D 宇宙单位是米，我们需要把毫米 * 0.001
   const scale = 0.001; 
@@ -29,7 +28,7 @@ function SlabInjectionMesh({ params }) {
 
   return (
     <group>
-      {/* 1. 浇筑楼板混凝土 (半透明蓝色) */}
+      {/* 1. 浇筑楼板混凝土 (半透明蓝色，展现空间体积) */}
       <mesh position={[0, slabY, 0]}>
         <boxGeometry args={[span, slabT, 2000 * scale]} />
         <meshStandardMaterial color="#38bdf8" transparent opacity={0.25} depthWrite={false} />
@@ -50,46 +49,6 @@ function SlabInjectionMesh({ params }) {
          {/* 右端部向下弯折锚固段 */}
          <mesh position={[span/2 - (rebarD/2), -bendL/2, 0]}>
            <boxGeometry args={[rebarD, bendL, rebarD]} />
-           <meshStandardMaterial color="#ec4899" />
-         </mesh>
-      </group>
-    </group>
-  );
-}
-  // 读取梁的真实尺寸，计算楼板的穿插坐标
-  const h = params?.h || 600;      // 梁高
-  const b = params?.b || 300;      // 梁宽
-  const span = params?.spanLength || params?.span || 4000; // 梁长
-  const slabT = 120; // 设定楼板厚度为 120mm
-  
-  // 结构逻辑：楼板顶面通常与梁顶面平齐。
-  // 3D 坐标系原点在梁中心，所以梁顶的 Y 坐标是 h/2
-  const slabY = (h / 2) - (slabT / 2);
-
-  return (
-    <group>
-      {/* 1. 浇筑楼板混凝土 (半透明蓝色，展现空间体积，不会挡住梁的内部钢筋) */}
-      <mesh position={[0, slabY, 0]}>
-        <boxGeometry args={[span, slabT, 2000]} />
-        <meshStandardMaterial color="#38bdf8" transparent opacity={0.25} depthWrite={false} />
-      </mesh>
-      
-      {/* 2. 核心构造演示：板面筋的空间穿插与 15d 弯折 */}
-      {/* 位置：板面上层，梁顶主筋上方 */}
-      <group position={[0, (h / 2) - 16, 0]}>
-         {/* 横向受力面筋直段 (模拟粉红色钢筋) */}
-         <mesh>
-           <boxGeometry args={[span, 16, 16]} />
-           <meshStandardMaterial color="#ec4899" />
-         </mesh>
-         {/* 左端部 15d 向下弯折锚固段 (模拟弯折长度) */}
-         <mesh position={[-span/2 + 8, -60, 0]}>
-           <boxGeometry args={[16, 120, 16]} />
-           <meshStandardMaterial color="#ec4899" />
-         </mesh>
-         {/* 右端部 15d 向下弯折锚固段 */}
-         <mesh position={[span/2 - 8, -60, 0]}>
-           <boxGeometry args={[16, 120, 16]} />
            <meshStandardMaterial color="#ec4899" />
          </mesh>
       </group>
