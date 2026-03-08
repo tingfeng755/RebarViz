@@ -7,20 +7,18 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 🚀 听风专属：CNC 级精密柔性曲线管道（真·无缝钢筋）
+// 🚀 听风专属：CNC 级精密柔性曲线管道（专治弯折打结）
 function TubePath({ points, radius, color }) {
-  // 使用 centripetal 类型防止曲线打结，点数给够就能完美圆滑
   const curve = useMemo(() => new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.5), [points]);
   return (
     <mesh>
-      {/* 提升了管壁圆滑度，参数为 [曲线, 管道分段数, 半径, 圆周分段数, 是否闭合] */}
       <tubeGeometry args={[curve, 64, radius, 12, false]} />
       <meshStandardMaterial color={color} roughness={0.4} metalness={0.6} />
     </mesh>
   );
 }
 
-// 🚧 柱-基础 原生 3D 节点生成引擎
+// 🚧 柱-基础 原生 3D 节点生成引擎 (完全体)
 function FoundationScene({ config, onSelect }) {
   const scale = 0.001; 
 
@@ -32,17 +30,39 @@ function FoundationScene({ config, onSelect }) {
   const colB = config.colB * scale;
   const colH = config.colH * scale;
   const colD = config.colD * scale;
-  const r = colD / 2;
+  const rCol = colD / 2;
   
-  // 底部坐标与弯折长度
-  const bottomY = -foundH + cover + (config.foundD * 2 * scale);
+  const foundD = config.foundD * scale;
+  const rFound = foundD / 2;
+  const foundSpacing = config.foundSpacing * scale;
+
+  // 标高计算
+  // 基础底面标高为 -foundH
+  // 底层钢筋网 Y 坐标 (X向)
+  const meshBottomY = -foundH + cover + rFound;
+  // 上层钢筋网 Y 坐标 (Z向)
+  const meshTopY = -foundH + cover + foundD + rFound;
+  // 柱插筋弯折段正好搭在上面
+  const bottomY = meshTopY + rFound; 
   const topY = 1.2; 
+  
   const bendLength_mm = Math.max(6 * config.colD, 150);
   const bendL = bendLength_mm * scale;
-
-  // 弯曲圆弧半径（通常取 2.5d）
   const bendR = config.colD * 2.5 * scale;
 
+  // 1. 算法：生成基础底板 X向 钢筋网 (底层)
+  const lenX = foundL - 2 * cover;
+  const countZ = Math.max(2, Math.floor((foundB - 2 * cover) / foundSpacing) + 1);
+  const actualSpacingZ = (foundB - 2 * cover) / (countZ - 1);
+  const foundRebarsX = Array.from({ length: countZ }, (_, i) => -foundB/2 + cover + i * actualSpacingZ);
+
+  // 2. 算法：生成基础底板 Z向 钢筋网 (上层)
+  const lenZ = foundB - 2 * cover;
+  const countX = Math.max(2, Math.floor((foundL - 2 * cover) / foundSpacing) + 1);
+  const actualSpacingX = (foundL - 2 * cover) / (countX - 1);
+  const foundRebarsZ = Array.from({ length: countX }, (_, i) => -foundL/2 + cover + i * actualSpacingX);
+
+  // 3. 算法：柱插筋位置
   const colRebarPos = [
     { x: -colB/2 + cover, z: -colH/2 + cover, dirX: -1, dirZ: -1 }, 
     { x: colB/2 - cover,  z: -colH/2 + cover, dirX: 1,  dirZ: -1 }, 
@@ -68,28 +88,62 @@ function FoundationScene({ config, onSelect }) {
 
   return (
     <group position={[0, foundH/2, 0]}> 
+      
+      {/* 混凝土 */}
       <mesh position={[0, -foundH/2, 0]}>
         <boxGeometry args={[foundL, foundH, foundB]} />
         <meshStandardMaterial color="#38bdf8" transparent opacity={0.15} depthWrite={false} />
       </mesh>
-      
       <mesh position={[0, topY/2, 0]}>
         <boxGeometry args={[colB, topY, colH]} />
         <meshStandardMaterial color="#94a3b8" transparent opacity={0.2} depthWrite={false} />
       </mesh>
 
+      {/* 🔵 基础底板双向钢筋网 */}
+      <group>
+        {/* X向底层网片 */}
+        {foundRebarsX.map((z, i) => (
+          <mesh 
+            key={`fx-${i}`} position={[0, meshBottomY, z]} rotation={[0, 0, Math.PI/2]}
+            onClick={(e) => handleRebarClick(e, {
+              name: '基础底板底层受力筋', spec: `HRB400 Φ${config.foundD} @${config.foundSpacing}`,
+              formula: '根数 = (B - 2c) / 间距 + 1', calcLabel: `当前方向排布根数`, calcValue: `${countZ} 根`,
+              desc: '按 22G101-3 规定，矩形基础短向受力筋应放在最底层。此处模拟底层网片，两端满足保护层要求。', color: 'bg-blue-600', uiColor: 'blue'
+            })}
+            {...cursorProps}
+          >
+            <cylinderGeometry args={[rFound, rFound, lenX, 8]} />
+            <meshStandardMaterial color="#2563eb" roughness={0.4} metalness={0.6} />
+          </mesh>
+        ))}
+
+        {/* Z向上层网片 */}
+        {foundRebarsZ.map((x, i) => (
+          <mesh 
+            key={`fz-${i}`} position={[x, meshTopY, 0]} rotation={[Math.PI/2, 0, 0]}
+            onClick={(e) => handleRebarClick(e, {
+              name: '基础底板上层受力筋', spec: `HRB400 Φ${config.foundD} @${config.foundSpacing}`,
+              formula: '根数 = (L - 2c) / 间距 + 1', calcLabel: `当前方向排布根数`, calcValue: `${countX} 根`,
+              desc: '铺设在底层网片之上，与底层钢筋绑扎形成正交钢筋网，共同承担地基反力。', color: 'bg-blue-500', uiColor: 'blue'
+            })}
+            {...cursorProps}
+          >
+            <cylinderGeometry args={[rFound, rFound, lenZ, 8]} />
+            <meshStandardMaterial color="#3b82f6" roughness={0.4} metalness={0.6} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* 🔴 柱插筋 (精密 CNC 圆弧段) */}
       <group>
         {colRebarPos.map((pos, i) => {
           const mag = Math.hypot(pos.dirX, pos.dirZ) || 1;
           const dx = pos.dirX / mag;
           const dz = pos.dirZ / mag;
-          
           const pts = [];
           
-          // 1. 直段顶部最高点
           pts.push(new THREE.Vector3(pos.x, topY, pos.z));
           
-          // 2. 🔴 核心修复：用三角函数切分 15 个点，强制画出完美的四分之一圆弧
           const arcSegments = 15;
           const cx = pos.x + bendR * dx;
           const cy = bottomY + bendR;
@@ -103,7 +157,6 @@ function FoundationScene({ config, onSelect }) {
             pts.push(new THREE.Vector3(px, py, pz));
           }
           
-          // 3. 底部向外延伸的锚固终点
           pts.push(new THREE.Vector3(pos.x + bendL * dx, bottomY, pos.z + bendL * dz));
 
           return (
@@ -112,16 +165,17 @@ function FoundationScene({ config, onSelect }) {
               onClick={(e) => handleRebarClick(e, {
                 name: '柱纵向插筋 (生根构造)', spec: `HRB400 Φ${config.colD}`,
                 formula: 'L_bend = max(6d, 150)', calcLabel: `弯折长度 (6×${config.colD})`, calcValue: `${bendLength_mm} mm`,
-                desc: '柱纵筋伸至基础底部钢筋网片之上，并向外平滑弯折。', color: 'bg-red-600', uiColor: 'red'
+                desc: '柱纵筋伸至基础底层钢筋网之上，并向外平滑弯折生根。', color: 'bg-red-600', uiColor: 'red'
               })}
               {...cursorProps}
             >
-              <TubePath points={pts} radius={r} color="#dc2626" />
+              <TubePath points={pts} radius={rCol} color="#dc2626" />
             </group>
           );
         })}
       </group>
 
+      {/* 🟢 基础内定位箍筋 */}
       <group>
         {stirrupPositions.map((y, i) => (
           <mesh 
@@ -129,11 +183,11 @@ function FoundationScene({ config, onSelect }) {
             onClick={(e) => handleRebarClick(e, {
               name: '基础内定位箍筋', spec: 'HRB400 Φ10',
               formula: '不少于两道，间距 ≤ 500', calcLabel: '基础内设置要求', calcValue: '必须设置',
-              desc: '在独立基础高度范围内，必须设置不少于两道矩形封闭箍筋，以固定柱纵筋位置。', color: 'bg-green-600', uiColor: 'green'
+              desc: '在独立基础高度范围内，设置矩形封闭箍筋，以固定柱纵筋。', color: 'bg-green-600', uiColor: 'green'
             })}
             {...cursorProps}
           >
-            <boxGeometry args={[colB - cover*2 + r*2, colD*scale, colH - cover*2 + r*2]} />
+            <boxGeometry args={[colB - cover*2 + rCol*2, colD*scale, colH - cover*2 + rCol*2]} />
             <meshStandardMaterial color="#16a34a" wireframe={true} />
           </mesh>
         ))}
@@ -144,7 +198,7 @@ function FoundationScene({ config, onSelect }) {
 
 // === 控制面板与 UI ===
 export default function FoundationViewer() {
-  const [activeTab, setActiveTab] = useState('column');
+  const [activeTab, setActiveTab] = useState('foundation');
   const [selectedRebar, setSelectedRebar] = useState(null);
   
   const [mounted, setMounted] = useState(false);
@@ -162,7 +216,7 @@ export default function FoundationViewer() {
     <div className="flex flex-col lg:flex-row w-full h-full min-h-[80vh] bg-slate-50 relative">
       <div className="flex-1 relative border-r border-slate-200" style={{ minHeight: '600px' }}>
         <div className="absolute top-4 left-4 z-10 bg-indigo-600 text-white px-4 py-2 rounded shadow-md font-bold cursor-pointer hover:bg-indigo-700">
-          ✅ 独立基础：完美圆弧 CNC 算法已激活！
+          ✅ 独立基础：全图集 3D 节点构建完成！
         </div>
 
         {selectedRebar && (
@@ -181,12 +235,12 @@ export default function FoundationViewer() {
                   <div className="flex justify-between items-center">
                      <span className="text-slate-500 text-xs font-bold">📚 22G101 构造公式</span>
                   </div>
-                  <div className={`font-mono font-bold text-center p-2 rounded border ${selectedRebar.uiColor === 'red' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
+                  <div className={`font-mono font-bold text-center p-2 rounded border ${selectedRebar.uiColor === 'red' ? 'bg-red-50 border-red-200 text-red-700' : selectedRebar.uiColor === 'blue' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
                     {selectedRebar.formula}
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t border-slate-200/60 mt-2">
                     <span className="text-slate-500 text-sm">{selectedRebar.calcLabel}</span>
-                    <span className={`font-mono font-bold text-lg ${selectedRebar.uiColor === 'red' ? 'text-red-600' : 'text-green-600'}`}>
+                    <span className={`font-mono font-bold text-lg ${selectedRebar.uiColor === 'red' ? 'text-red-600' : selectedRebar.uiColor === 'blue' ? 'text-blue-600' : 'text-green-600'}`}>
                       {selectedRebar.calcValue}
                     </span>
                   </div>
@@ -226,7 +280,39 @@ export default function FoundationViewer() {
         <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 shadow-sm">
            <h3 className="font-bold text-blue-900 mb-4 flex items-center gap-2"><span>🎛️</span> 22G101 参数化控制台</h3>
            <div className="space-y-4">
+              {/* 独立基础部分 */}
               <div className="pt-2 border-t border-blue-200/50">
+                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">22G101-3 独立基础尺寸与配筋</p>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-slate-500">基础长度 L (mm)</label>
+                    <input type="number" step="100" value={config.foundL} onChange={e => { setConfig({...config, foundL: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono focus:ring-1 focus:ring-blue-400 outline-none" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-slate-500">基础宽度 B (mm)</label>
+                    <input type="number" step="100" value={config.foundB} onChange={e => { setConfig({...config, foundB: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono focus:ring-1 focus:ring-blue-400 outline-none" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-slate-500">基础高度 h (mm)</label>
+                    <input type="number" step="50" value={config.foundH} onChange={e => { setConfig({...config, foundH: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono focus:ring-1 focus:ring-blue-400 outline-none" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-slate-500">底筋直径 d (mm)</label>
+                    <input type="number" step="2" value={config.foundD} onChange={e => { setConfig({...config, foundD: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono focus:ring-1 focus:ring-blue-400 outline-none" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-slate-500">底筋间距 (mm)</label>
+                    <input type="number" step="10" value={config.foundSpacing} onChange={e => { setConfig({...config, foundSpacing: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono focus:ring-1 focus:ring-blue-400 outline-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 柱插筋部分 */}
+              <div className="pt-4 border-t border-blue-200/50 mt-4">
                 <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">22G101-1 柱插筋生根</p>
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <div className="flex flex-col gap-1">
@@ -254,13 +340,15 @@ export default function FoundationViewer() {
         </div>
 
         {activeTab === 'foundation' && (
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 space-y-3">
-            <h4 className="font-bold text-blue-800 text-sm italic">22G101-3 独立基础</h4>
-            <p className="text-xs text-slate-600 leading-relaxed">底板双向受力筋算法即将注入，敬请期待...</p>
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 space-y-3 animate-in fade-in">
+            <h4 className="font-bold text-blue-800 text-sm italic">22G101-3 独立基础底板配筋</h4>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              基础底板采用双向受力筋，执行“短向在底层，长向在上层”原则。在 3D 图中点击蓝色网片，可查看当前设置下对应的钢筋排布根数与规范计算公式。
+            </p>
           </div>
         )}
         {activeTab === 'column' && (
-          <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100 space-y-3">
+          <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100 space-y-3 animate-in fade-in">
             <h4 className="font-bold text-indigo-800 text-sm italic">柱纵筋在基础中生根</h4>
             <div className="bg-white p-2 rounded border font-mono text-[10px] text-center text-indigo-700 shadow-sm">L_bend = max(6d, 150mm)</div>
             <p className="text-xs text-slate-600 mt-2">💡 提示：在左侧 3D 画布中，点击红色的柱纵筋或绿色的箍筋，查看详细锚固规范！</p>
