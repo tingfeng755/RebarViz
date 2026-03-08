@@ -4,7 +4,51 @@
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 
+// 召唤开好后门的 3D 梁画笔
 const BeamViewer = dynamic(() => import('@/components/BeamViewer'), { ssr: false });
+
+// 🚧 听风专属：楼板与面筋 3D 坐标生成器 (通过 children 注入到梁的宇宙中)
+function SlabInjectionMesh({ params }) {
+  // 读取梁的真实尺寸，计算楼板的穿插坐标
+  const h = params?.h || 600;      // 梁高
+  const b = params?.b || 300;      // 梁宽
+  const span = params?.spanLength || params?.span || 4000; // 梁长
+  const slabT = 120; // 设定楼板厚度为 120mm
+  
+  // 结构逻辑：楼板顶面通常与梁顶面平齐。
+  // 3D 坐标系原点在梁中心，所以梁顶的 Y 坐标是 h/2
+  const slabY = (h / 2) - (slabT / 2);
+
+  return (
+    <group>
+      {/* 1. 浇筑楼板混凝土 (半透明蓝色，展现空间体积，不会挡住梁的内部钢筋) */}
+      <mesh position={[0, slabY, 0]}>
+        <boxGeometry args={[span, slabT, 2000]} />
+        <meshStandardMaterial color="#38bdf8" transparent opacity={0.25} depthWrite={false} />
+      </mesh>
+      
+      {/* 2. 核心构造演示：板面筋的空间穿插与 15d 弯折 */}
+      {/* 位置：板面上层，梁顶主筋上方 */}
+      <group position={[0, (h / 2) - 16, 0]}>
+         {/* 横向受力面筋直段 (模拟粉红色钢筋) */}
+         <mesh>
+           <boxGeometry args={[span, 16, 16]} />
+           <meshStandardMaterial color="#ec4899" />
+         </mesh>
+         {/* 左端部 15d 向下弯折锚固段 (模拟弯折长度) */}
+         <mesh position={[-span/2 + 8, -60, 0]}>
+           <boxGeometry args={[16, 120, 16]} />
+           <meshStandardMaterial color="#ec4899" />
+         </mesh>
+         {/* 右端部 15d 向下弯折锚固段 */}
+         <mesh position={[span/2 - 8, -60, 0]}>
+           <boxGeometry args={[16, 120, 16]} />
+           <meshStandardMaterial color="#ec4899" />
+         </mesh>
+      </group>
+    </group>
+  );
+}
 
 export default function BeamSlabViewer({ params, isMobile }) {
   const [activeTab, setActiveTab] = useState('bottom');
@@ -14,10 +58,14 @@ export default function BeamSlabViewer({ params, isMobile }) {
       
       {/* 👑 左侧：3D 核心渲染区 */}
       <div className="flex-1 relative border-r border-slate-200" style={{ minHeight: '500px' }}>
-        <div className="absolute top-4 left-4 z-10 bg-blue-600 text-white px-4 py-2 rounded shadow-md font-bold">
-          🚧 梁板节点：穿插与锚固 3D 坐标注入中...
+        <div className="absolute top-4 left-4 z-10 bg-emerald-600 text-white px-4 py-2 rounded shadow-md font-bold">
+          ✅ 梁板节点：真实 3D 穿插注入完成！
         </div>
-        <BeamViewer params={params} isMobile={isMobile} />
+        
+        {/* 关键神作：把 SlabInjectionMesh 当做木马，直接塞进 BeamViewer 的肚子里！ */}
+        <BeamViewer params={params} isMobile={isMobile}>
+           <SlabInjectionMesh params={params} />
+        </BeamViewer>
       </div>
 
       {/* 📚 右侧：22G101 图集规范与计算公式面板 */}
@@ -48,7 +96,6 @@ export default function BeamSlabViewer({ params, isMobile }) {
               <p className="text-sm text-slate-600 mb-3">板底钢筋伸入支座内，必须伸过支座中心线，且满足直锚长度要求。</p>
               
               <div className="bg-white p-4 rounded border font-mono text-sm text-slate-800 flex justify-center overflow-x-auto shadow-sm">
-                {/* 给公式穿上防弹衣：用引号包起来，避免大括号被当成代码执行 */}
                 {"L_bottom ≥ MAX( b/2, 5d )"}
               </div>
               
@@ -68,7 +115,7 @@ export default function BeamSlabViewer({ params, isMobile }) {
           <div className="space-y-4 animate-in fade-in duration-300">
             <div className="p-4 bg-pink-50 rounded-lg border border-pink-100">
               <h3 className="font-bold text-pink-800 mb-2">上部负弯矩筋构造</h3>
-              <p className="text-sm text-slate-600 mb-3">面筋在端梁处需向下弯折直锚，且必须考虑保护层的绝对避让。</p>
+              <p className="text-sm text-slate-600 mb-3">注意看左侧 3D 模型中的<strong className="text-pink-600">粉色钢筋</strong>！面筋在端梁处需向下弯折直锚。</p>
               
               <div className="bg-white p-4 rounded border font-mono text-sm text-slate-800 flex justify-center shadow-sm">
                 {"L_bend = 15d"}
