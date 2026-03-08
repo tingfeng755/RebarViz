@@ -8,49 +8,70 @@ import dynamic from 'next/dynamic';
 const BeamViewer = dynamic(() => import('@/components/BeamViewer'), { ssr: false });
 
 // 🚧 听风专属：楼板与面筋 3D 坐标生成器 (已彻底修复单位缩放比例)
+// 🚧 听风专属：楼板与双层钢筋网 3D 阵列生成器
 function SlabInjectionMesh({ params }) {
-  // 核心修复：原作者的 3D 宇宙单位是米，我们需要把毫米 * 0.001
   const scale = 0.001; 
 
-  // 读取梁的真实尺寸并缩放
+  // 读取梁的尺寸
   const h = (params?.h || 600) * scale;      
-  const b = (params?.b || 300) * scale;      
   const span = (params?.spanLength || params?.span || 4000) * scale; 
   
-  // 楼板厚度 120mm 和 保护层下沉 20mm
+  // 楼板物理尺寸
   const slabT = 120 * scale; 
+  const slabWidth = 2000 * scale; // 模拟 2 米宽的楼板
   const slabY = (h / 2) - (slabT / 2);
-  const cover = 20 * scale;
   
-  // 钢筋直径 16mm 和 弯折 15d (约 15*16=240mm)
-  const rebarD = 16 * scale;
-  const bendL = 240 * scale;
+  // 钢筋参数
+  const cover = 15 * scale; // 保护层 15mm
+  const d = 12 * scale;     // 钢筋直径放大到 12mm 以便观察
+  const bendL = 15 * d;     // 15d 弯折长度
+  const spacing = 200 * scale; // 钢筋间距 @200
+
+  // 算法：计算在 2 米宽的板里，需要排布多少根钢筋
+  const countZ = Math.floor(slabWidth / spacing);
+  const startZ = -slabWidth / 2 + spacing / 2;
+  // 生成每一根钢筋的 Z 轴坐标数组
+  const zPositions = Array.from({ length: countZ }).map((_, i) => startZ + i * spacing);
 
   return (
     <group>
-      {/* 1. 浇筑楼板混凝土 (半透明蓝色，展现空间体积) */}
+      {/* 1. 浇筑半透明楼板，透明度调低，防止挡住钢筋 */}
       <mesh position={[0, slabY, 0]}>
-        <boxGeometry args={[span, slabT, 2000 * scale]} />
-        <meshStandardMaterial color="#38bdf8" transparent opacity={0.25} depthWrite={false} />
+        <boxGeometry args={[span, slabT, slabWidth]} />
+        <meshStandardMaterial color="#38bdf8" transparent opacity={0.15} depthWrite={false} />
       </mesh>
       
-      {/* 2. 核心构造演示：板面筋的空间穿插与 15d 弯折 */}
-      <group position={[0, (h / 2) - cover, 0]}>
-         {/* 横向受力面筋直段 (粉红色钢筋) */}
-         <mesh>
-           <boxGeometry args={[span, rebarD, rebarD]} />
-           <meshStandardMaterial color="#ec4899" />
-         </mesh>
-         {/* 左端部向下弯折锚固段 */}
-         <mesh position={[-span/2 + (rebarD/2), -bendL/2, 0]}>
-           <boxGeometry args={[rebarD, bendL, rebarD]} />
-           <meshStandardMaterial color="#ec4899" />
-         </mesh>
-         {/* 右端部向下弯折锚固段 */}
-         <mesh position={[span/2 - (rebarD/2), -bendL/2, 0]}>
-           <boxGeometry args={[rebarD, bendL, rebarD]} />
-           <meshStandardMaterial color="#ec4899" />
-         </mesh>
+      {/* 2. 🔵 板底受力筋网 (@200 间距排布) */}
+      <group position={[0, slabY - (slabT/2) + cover + d/2, 0]}>
+        {zPositions.map((z, i) => (
+          <mesh key={`bottom-rebar-${i}`} position={[0, 0, z]}>
+            <boxGeometry args={[span, d, d]} />
+            <meshStandardMaterial color="#2563eb" /> {/* 蓝色代表底筋 */}
+          </mesh>
+        ))}
+      </group>
+
+      {/* 3. 🔴 板面负弯矩筋网 (@200 间距排布，带 15d 弯折，下沉避让梁主筋) */}
+      <group position={[0, (h / 2) - cover - d/2, 0]}>
+         {zPositions.map((z, i) => (
+          <group key={`top-rebar-${i}`} position={[0, 0, z]}>
+            {/* 面筋直段 */}
+            <mesh>
+              <boxGeometry args={[span, d, d]} />
+              <meshStandardMaterial color="#ec4899" />
+            </mesh>
+            {/* 左端部 15d 向下弯折 */}
+            <mesh position={[-span/2 + d/2, -bendL/2, 0]}>
+              <boxGeometry args={[d, bendL, d]} />
+              <meshStandardMaterial color="#ec4899" />
+            </mesh>
+            {/* 右端部 15d 向下弯折 */}
+            <mesh position={[span/2 - d/2, -bendL/2, 0]}>
+              <boxGeometry args={[d, bendL, d]} />
+              <meshStandardMaterial color="#ec4899" />
+            </mesh>
+          </group>
+        ))}
       </group>
     </group>
   );
