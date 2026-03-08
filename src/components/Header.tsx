@@ -1,5 +1,3 @@
-/* eslint-disable */
-// @ts-nocheck
 'use client';
 
 import Link from 'next/link';
@@ -15,14 +13,15 @@ const NAV = [
   { href: '/foundation', label: '基础 DJ', icon: Box },
 ];
 
-export default function Header() {
+// 🚀 核心修复：去掉了 default，直接导出 Header，完美匹配 layout.tsx
+export function Header() {
   const pathname = usePathname();
   
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900 border-b border-slate-800 backdrop-blur-md bg-slate-900/90 h-14 shadow-lg">
       <div className="max-w-screen-2xl mx-auto px-4 h-full flex items-center justify-between">
         
-        {/* 左侧 Logo 与 招牌 */}
+        {/* ============ 左侧 Logo 与 专属招牌 ============ */}
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black shadow-[0_0_15px_rgba(37,99,235,0.5)]">宋</div>
            <div className="hidden sm:flex items-baseline gap-1.5">
@@ -31,7 +30,7 @@ export default function Header() {
            </div>
         </Link>
         
-        {/* 右侧 导航菜单 */}
+        {/* ============ 右侧 导航菜单 ============ */}
         <nav className="hidden lg:flex items-center gap-6 h-full">
           {NAV.map((l) => (
             <Link 
