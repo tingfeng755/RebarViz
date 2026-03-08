@@ -12,6 +12,7 @@ const NAV = [
   { href: '/slab', label: '板 LB', icon: LayoutGrid },
   { href: '/joint', label: '节点', icon: GitMerge },
   { href: '/beam-slab', label: '梁板节点', icon: Layers }
+  { href: '/foundation', label: '基础 DJ', icon: Box },
 ];
 
 export function Header() {
