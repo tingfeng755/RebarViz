@@ -33,7 +33,7 @@ export function Header() {
             </svg>
           </div>
           <div className="leading-tight">
-            <span className={`text-base font-bold ${isLanding ? 'text-white' : 'text-gray-800'}`}>RebarViz</span>
+            <span className={`text-base font-bold ${isLanding ? 'text-white' : 'text-gray-800'}`}>鹏哥</span>
             <span className={`hidden sm:block text-[11px] ${isLanding ? 'text-gray-400' : 'text-muted'}`}>钢筋平法识图 · 22G101</span>
           </div>
         </Link>
