@@ -1,18 +1,15 @@
 // @ts-nocheck
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import dynamic from 'next/dynamic';
+import React, { useState } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 借用底层的 3D 画布环境
-const BeamViewer = dynamic(() => import('@/components/BeamViewer'), { ssr: false });
-
-// 🚧 听风专属：柱-基础 3D 节点生成引擎
-function FoundationInjectionMesh({ config, onSelect }) {
+// 🚧 听风专属：柱-基础 原生 3D 节点生成引擎 (彻底脱离 BeamViewer)
+function FoundationScene({ config, onSelect }) {
   const scale = 0.001; 
 
-  // 读取参数并进行毫米到米的转换
   const foundH = config.foundH * scale;
   const foundL = config.foundL * scale;
   const foundB = config.foundB * scale;
@@ -23,33 +20,28 @@ function FoundationInjectionMesh({ config, onSelect }) {
   const colD = config.colD * scale;
   const r = colD / 2;
   
-  // 核心计算 1：柱插筋的底部 Y 坐标 (基础高度 - 底部保护层 - 预留底板钢筋厚度)
   const bottomY = -foundH + cover + (config.foundD * 2 * scale);
-  // 柱子向上伸出的高度 (模拟伸出基础面 1.2 米)
   const topY = 1.2; 
   const rebarLength = topY - bottomY;
   const rebarCenterY = bottomY + rebarLength / 2;
 
-  // 核心计算 2：图集规范弯折长度 max(6d, 150mm)
   const bendLength_mm = Math.max(6 * config.colD, 150);
   const bendL = bendLength_mm * scale;
 
-  // 算法：生成柱周边纵筋的坐标 (简化版：四角 + 四边中点，共8根)
   const colRebarPos = [
-    { x: -colB/2 + cover, z: -colH/2 + cover, dirX: -1, dirZ: -1 }, // 左上角
-    { x: colB/2 - cover,  z: -colH/2 + cover, dirX: 1,  dirZ: -1 }, // 右上角
-    { x: -colB/2 + cover, z: colH/2 - cover,  dirX: -1, dirZ: 1 },  // 左下角
-    { x: colB/2 - cover,  z: colH/2 - cover,  dirX: 1,  dirZ: 1 },  // 右下角
-    { x: 0,               z: -colH/2 + cover, dirX: 0,  dirZ: -1 }, // 上中
-    { x: 0,               z: colH/2 - cover,  dirX: 0,  dirZ: 1 },  // 下中
-    { x: -colB/2 + cover, z: 0,               dirX: -1, dirZ: 0 },  // 左中
-    { x: colB/2 - cover,  z: 0,               dirX: 1,  dirZ: 0 },  // 右中
+    { x: -colB/2 + cover, z: -colH/2 + cover, dirX: -1, dirZ: -1 }, 
+    { x: colB/2 - cover,  z: -colH/2 + cover, dirX: 1,  dirZ: -1 }, 
+    { x: -colB/2 + cover, z: colH/2 - cover,  dirX: -1, dirZ: 1 },  
+    { x: colB/2 - cover,  z: colH/2 - cover,  dirX: 1,  dirZ: 1 },  
+    { x: 0,               z: -colH/2 + cover, dirX: 0,  dirZ: -1 }, 
+    { x: 0,               z: colH/2 - cover,  dirX: 0,  dirZ: 1 },  
+    { x: -colB/2 + cover, z: 0,               dirX: -1, dirZ: 0 },  
+    { x: colB/2 - cover,  z: 0,               dirX: 1,  dirZ: 0 },  
   ];
 
-  // 算法：基础内定位箍筋 (至少两道，距底 100mm 一道，基础顶面下一道)
   const stirrupPositions = [
-    bottomY + 0.1, // 距底 100mm
-    -0.1           // 距基础顶 100mm
+    bottomY + 0.1, 
+    -0.1           
   ];
 
   const handleRebarClick = (e, info) => {
@@ -63,21 +55,17 @@ function FoundationInjectionMesh({ config, onSelect }) {
   };
 
   return (
-    <group position={[0, foundH/2, 0]}> {/* 整体抬高，让基础顶面位于 Y=0 */}
-      
-      {/* 1. 浇筑独立基础混凝土 (半透明蓝色) */}
+    <group position={[0, foundH/2, 0]}> 
       <mesh position={[0, -foundH/2, 0]}>
         <boxGeometry args={[foundL, foundH, foundB]} />
         <meshStandardMaterial color="#38bdf8" transparent opacity={0.15} depthWrite={false} />
       </mesh>
       
-      {/* 2. 浇筑框架柱混凝土 (半透明灰色) */}
       <mesh position={[0, topY/2, 0]}>
         <boxGeometry args={[colB, topY, colH]} />
         <meshStandardMaterial color="#94a3b8" transparent opacity={0.2} depthWrite={false} />
       </mesh>
 
-      {/* 3. 🔴 框架柱纵筋插筋 (带底部弯折) */}
       <group>
         {colRebarPos.map((pos, i) => (
           <group 
@@ -89,12 +77,10 @@ function FoundationInjectionMesh({ config, onSelect }) {
             })}
             {...cursorProps}
           >
-            {/* 竖向直段 */}
             <mesh position={[pos.x, rebarCenterY, pos.z]}>
               <cylinderGeometry args={[r, r, rebarLength, 8]} />
               <meshStandardMaterial color="#dc2626" />
             </mesh>
-            {/* 底部 90度 弯折段 (向外弯折) */}
             <mesh 
               position={[pos.x + (bendL/2)*pos.dirX, bottomY + r, pos.z + (bendL/2)*pos.dirZ]}
               rotation={[pos.dirZ !== 0 ? Math.PI/2 : 0, 0, pos.dirX !== 0 ? Math.PI/2 : 0]}
@@ -106,7 +92,6 @@ function FoundationInjectionMesh({ config, onSelect }) {
         ))}
       </group>
 
-      {/* 4. 🟢 基础内部定位箍筋 */}
       <group>
         {stirrupPositions.map((y, i) => (
           <mesh 
@@ -114,23 +99,21 @@ function FoundationInjectionMesh({ config, onSelect }) {
             onClick={(e) => handleRebarClick(e, {
               name: '基础内定位箍筋', spec: 'HRB400 Φ10',
               formula: '不少于两道，间距 ≤ 500', calcLabel: '基础内设置要求', calcValue: '必须设置',
-              desc: '在独立基础高度范围内，必须设置不少于两道矩形封闭箍筋，以固定柱纵筋位置，防止浇筑混凝土时钢筋位移。', color: 'bg-green-600', uiColor: 'green'
+              desc: '在独立基础高度范围内，必须设置不少于两道矩形封闭箍筋，以固定柱纵筋位置。', color: 'bg-green-600', uiColor: 'green'
             })}
             {...cursorProps}
           >
-            {/* 用 TubeGeometry 画一个方形空心管来模拟箍筋 */}
             <boxGeometry args={[colB - cover*2 + r*2, colD*scale, colH - cover*2 + r*2]} />
             <meshStandardMaterial color="#16a34a" wireframe={true} />
           </mesh>
         ))}
       </group>
-
     </group>
   );
 }
 
-// === 下面是面板组件（注入了弹窗 UI） ===
-export default function FoundationViewer({ params: initialParams, isMobile }) {
+// === 控制面板与 UI ===
+export default function FoundationViewer() {
   const [activeTab, setActiveTab] = useState('column');
   const [selectedRebar, setSelectedRebar] = useState(null);
 
@@ -145,13 +128,12 @@ export default function FoundationViewer({ params: initialParams, isMobile }) {
   return (
     <div className="flex flex-col lg:flex-row w-full h-full min-h-[80vh] bg-slate-50 relative">
       
-      {/* 👑 左侧：3D 核心渲染区 */}
-      <div className="flex-1 relative border-r border-slate-200" style={{ minHeight: '500px' }}>
+      {/* 👑 左侧：原生 3D 核心渲染区 */}
+      <div className="flex-1 relative border-r border-slate-200" style={{ minHeight: '600px' }}>
         <div className="absolute top-4 left-4 z-10 bg-indigo-600 text-white px-4 py-2 rounded shadow-md font-bold cursor-pointer hover:bg-indigo-700">
-          ✅ 柱生根节点：3D 穿插注入完成！
+          ✅ 独立基础：专属 3D 引擎启动成功！
         </div>
 
-        {/* 专属悬浮信息卡片 */}
         {selectedRebar && (
           <div className="absolute top-16 right-4 z-20 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
             <div className={`${selectedRebar.color} px-4 py-3 flex justify-between items-center text-white`}>
@@ -187,9 +169,20 @@ export default function FoundationViewer({ params: initialParams, isMobile }) {
           </div>
         )}
         
-        <BeamViewer params={initialParams} isMobile={isMobile}>
-           <FoundationInjectionMesh config={config} onSelect={setSelectedRebar} />
-        </BeamViewer>
+        {/* 植入完全独立的 3D 画布环境 */}
+        <div className="w-full h-full bg-[#f8fafc]">
+          <Canvas camera={{ position: [3, 2, 4], fov: 45 }}>
+            <ambientLight intensity={0.6} />
+            <directionalLight position={[5, 8, 5]} intensity={0.8} castShadow />
+            <FoundationScene config={config} onSelect={setSelectedRebar} />
+            <Grid args={[10, 10]} position={[0, -0.01, 0]} cellColor="#E2E8F0" sectionColor="#E2E8F0" fadeDistance={15} />
+            <axesHelper args={[1.5]} />
+            <OrbitControls target={[0, 0.5, 0]} enableDamping dampingFactor={0.1} />
+          </Canvas>
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-800/80 text-white text-[11px] px-4 py-1.5 rounded-full backdrop-blur-sm pointer-events-none shadow-lg">
+            左键旋转 · 右键平移 · 滚轮缩放 · <span className="text-indigo-300 font-bold">点击钢筋查看规范</span>
+          </div>
+        </div>
       </div>
 
       {/* 📚 右侧：专属控制中心 */}
@@ -234,7 +227,7 @@ export default function FoundationViewer({ params: initialParams, isMobile }) {
           <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100 space-y-3">
             <h4 className="font-bold text-indigo-800 text-sm italic">柱纵筋在基础中生根</h4>
             <div className="bg-white p-2 rounded border font-mono text-[10px] text-center text-indigo-700 shadow-sm">L_bend = max(6d, 150mm)</div>
-            <p className="text-xs text-slate-600 leading-relaxed">💡 提示：在左侧 3D 画布中，点击红色的柱纵筋或绿色的箍筋，查看详细锚固规范！</p>
+            <p className="text-xs text-slate-600 mt-2">💡 提示：在左侧 3D 画布中，点击红色的柱纵筋或绿色的箍筋，查看详细锚固规范！</p>
           </div>
         )}
       </div>
