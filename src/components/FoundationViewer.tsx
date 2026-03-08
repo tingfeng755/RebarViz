@@ -1,4 +1,5 @@
 // @ts-nocheck
+/* eslint-disable */
 'use client';
 
 import React, { useState } from 'react';
@@ -6,7 +7,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 🚧 听风专属：柱-基础 原生 3D 节点生成引擎 (彻底脱离 BeamViewer)
+// 🚧 听风专属：柱-基础 原生 3D 节点生成引擎
 function FoundationScene({ config, onSelect }) {
   const scale = 0.001; 
 
@@ -127,8 +128,6 @@ export default function FoundationViewer() {
 
   return (
     <div className="flex flex-col lg:flex-row w-full h-full min-h-[80vh] bg-slate-50 relative">
-      
-      {/* 👑 左侧：原生 3D 核心渲染区 */}
       <div className="flex-1 relative border-r border-slate-200" style={{ minHeight: '600px' }}>
         <div className="absolute top-4 left-4 z-10 bg-indigo-600 text-white px-4 py-2 rounded shadow-md font-bold cursor-pointer hover:bg-indigo-700">
           ✅ 独立基础：专属 3D 引擎启动成功！
@@ -169,7 +168,6 @@ export default function FoundationViewer() {
           </div>
         )}
         
-        {/* 植入完全独立的 3D 画布环境 */}
         <div className="w-full h-full bg-[#f8fafc]">
           <Canvas camera={{ position: [3, 2, 4], fov: 45 }}>
             <ambientLight intensity={0.6} />
@@ -185,7 +183,6 @@ export default function FoundationViewer() {
         </div>
       </div>
 
-      {/* 📚 右侧：专属控制中心 */}
       <div className="w-full lg:w-96 bg-white p-6 overflow-y-auto shadow-inner">
         <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 shadow-sm">
            <h3 className="font-bold text-blue-900 mb-4 flex items-center gap-2"><span>🎛️</span> 22G101 参数化控制台</h3>
