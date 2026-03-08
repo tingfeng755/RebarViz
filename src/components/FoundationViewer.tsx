@@ -1,15 +1,15 @@
-// @ts-nocheck
 /* eslint-disable */
+// @ts-nocheck
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 🚀 柔性曲线管道
+// 🚀 纯净版柔性曲线管道（移除了会引发报错的 useMemo 检查）
 function TubePath({ points, radius, color }) {
-  const curve = useMemo(() => new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.5), [points]);
+  const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.5);
   return (
     <mesh>
       <tubeGeometry args={[curve, 64, radius, 12, false]} />
@@ -36,17 +36,15 @@ function FoundationScene({ config, onSelect }) {
   const rFound = foundD / 2;
   const foundSpacing = config.foundSpacing * scale;
 
-  // 标高计算
-  const meshBottomY = -foundH + cover + rFound; // 底筋下层
-  const meshTopY = -foundH + cover + foundD + rFound; // 底筋上层
-  const bottomY = meshTopY + rFound; // 柱插筋生根位置
+  const meshBottomY = -foundH + cover + rFound; 
+  const meshTopY = -foundH + cover + foundD + rFound; 
+  const bottomY = meshTopY + rFound; 
   const topY = 1.2; 
   
   const bendLength_mm = Math.max(6 * config.colD, 150);
   const bendL = bendLength_mm * scale;
   const bendR = config.colD * 2.5 * scale;
 
-  // 🔵 底板钢筋网计算
   const lenX = foundL - 2 * cover;
   const countZ = Math.max(2, Math.floor((foundB - 2 * cover) / foundSpacing) + 1);
   const actualSpacingZ = (foundB - 2 * cover) / (countZ - 1);
@@ -57,15 +55,13 @@ function FoundationScene({ config, onSelect }) {
   const actualSpacingX = (foundL - 2 * cover) / (countX - 1);
   const foundRebarsZ = Array.from({ length: countX }, (_, i) => -foundL/2 + cover + i * actualSpacingX);
 
-  // 🟣 面筋钢筋网计算 (如果开启)
   const hasTopRebar = config.hasTopRebar;
   const topD = config.topD * scale;
   const rTop = topD / 2;
   const topSpacing = config.topSpacing * scale;
   
-  // 面筋标高 (基于基础顶面 0 往下算)
-  const topMeshY1 = 0 - cover - rTop; // 面筋最上层
-  const topMeshY2 = 0 - cover - topD - rTop; // 面筋次上层
+  const topMeshY1 = 0 - cover - rTop; 
+  const topMeshY2 = 0 - cover - topD - rTop; 
 
   let topRebarsX = [];
   let topRebarsZ = [];
@@ -82,7 +78,6 @@ function FoundationScene({ config, onSelect }) {
     topRebarsZ = Array.from({ length: countTopX }, (_, i) => -foundL/2 + cover + i * actualTopSpacingX);
   }
 
-  // 柱插筋
   const colRebarPos = [
     { x: -colB/2 + cover, z: -colH/2 + cover, dirX: -1, dirZ: -1 }, 
     { x: colB/2 - cover,  z: -colH/2 + cover, dirX: 1,  dirZ: -1 }, 
@@ -112,7 +107,6 @@ function FoundationScene({ config, onSelect }) {
         <meshStandardMaterial color="#94a3b8" transparent opacity={0.2} depthWrite={false} />
       </mesh>
 
-      {/* 🔵 底层钢筋网 */}
       <group>
         {foundRebarsX.map((z, i) => (
           <mesh key={`fx-${i}`} position={[0, meshBottomY, z]} rotation={[0, 0, Math.PI/2]}
@@ -138,7 +132,6 @@ function FoundationScene({ config, onSelect }) {
         ))}
       </group>
 
-      {/* 🟣 顶部面筋网 (受开关控制) */}
       {hasTopRebar && (
         <group>
           {topRebarsX.map((z, i) => (
@@ -166,7 +159,6 @@ function FoundationScene({ config, onSelect }) {
         </group>
       )}
 
-      {/* 🔴 柱插筋 */}
       <group>
         {colRebarPos.map((pos, i) => {
           const mag = Math.hypot(pos.dirX, pos.dirZ) || 1;
@@ -192,7 +184,6 @@ function FoundationScene({ config, onSelect }) {
         })}
       </group>
 
-      {/* 🟢 箍筋 */}
       <group>
         {stirrupPositions.map((y, i) => (
           <mesh key={`stirrup-${i}`} position={[0, y, 0]} onClick={(e) => handleRebarClick(e, {
@@ -212,13 +203,13 @@ export default function FoundationViewer() {
   const [activeTab, setActiveTab] = useState('foundation');
   const [selectedRebar, setSelectedRebar] = useState(null);
   const [mounted, setMounted] = useState(false);
+  
   useEffect(() => { setMounted(true); }, []);
 
-  // 🚀 新增 hasTopRebar 和 topD 等面筋参数
   const [config, setConfig] = useState({
     foundL: 2000, foundB: 2000, foundH: 600,
     foundD: 14, foundSpacing: 200, 
-    hasTopRebar: false, topD: 12, topSpacing: 200, // 默认关闭，面筋直径12
+    hasTopRebar: false, topD: 12, topSpacing: 200, 
     colB: 500, colH: 500, colD: 25, colCount: 8,
     concGrade: 'C30', seismicGrade: '二级', cover: 40
   });
@@ -227,7 +218,7 @@ export default function FoundationViewer() {
     <div className="flex flex-col lg:flex-row w-full h-full min-h-[80vh] bg-slate-50 relative">
       <div className="flex-1 relative border-r border-slate-200" style={{ minHeight: '600px' }}>
         <div className="absolute top-4 left-4 z-10 bg-indigo-600 text-white px-4 py-2 rounded shadow-md font-bold">
-          ✅ 独立基础：动态面筋引擎就绪！
+          ✅ 独立基础：防闪退纯净版引擎就绪！
         </div>
 
         {selectedRebar && (
@@ -255,7 +246,7 @@ export default function FoundationViewer() {
         )}
         
         <div className="w-full h-full bg-[#f8fafc]">
-          {mounted ? (
+          {mounted && (
             <Canvas camera={{ position: [3, 2, 4], fov: 45 }}>
               <ambientLight intensity={0.6} />
               <directionalLight position={[5, 8, 5]} intensity={0.8} />
@@ -264,7 +255,12 @@ export default function FoundationViewer() {
               <axesHelper args={[1.5]} />
               <OrbitControls target={[0, 0.5, 0]} enableDamping dampingFactor={0.1} />
             </Canvas>
-          ) : null}
+          )}
+          {!mounted && (
+            <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold">
+              🚀 3D 引擎预热中...
+            </div>
+          )}
         </div>
       </div>
 
@@ -274,45 +270,4 @@ export default function FoundationViewer() {
            <div className="space-y-4">
               <div className="pt-2 border-t border-blue-200/50">
                 <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">22G101-3 独立基础底层</p>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[11px] text-slate-500">基础长度 L (mm)</label>
-                    <input type="number" step="100" value={config.foundL} onChange={e => { setConfig({...config, foundL: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono focus:ring-1 outline-none" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[11px] text-slate-500">基础宽度 B (mm)</label>
-                    <input type="number" step="100" value={config.foundB} onChange={e => { setConfig({...config, foundB: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono focus:ring-1 outline-none" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <div className="flex flex-col gap-1"><label className="text-[11px] text-slate-500">基础高度 h (mm)</label><input type="number" step="50" value={config.foundH} onChange={e => { setConfig({...config, foundH: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono" /></div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col gap-1"><label className="text-[11px] text-slate-500">底筋直径 d (mm)</label><input type="number" step="2" value={config.foundD} onChange={e => { setConfig({...config, foundD: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono" /></div>
-                  <div className="flex flex-col gap-1"><label className="text-[11px] text-slate-500">底筋间距 (mm)</label><input type="number" step="10" value={config.foundSpacing} onChange={e => { setConfig({...config, foundSpacing: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono" /></div>
-                </div>
-              </div>
-
-              {/* 🚀 听风新增：面筋动态开关与配置 */}
-              <div className="pt-3 border-t border-purple-200/50 mt-3 bg-purple-50/50 p-2 rounded">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">顶部面筋网 (附加)</p>
-                  <label className="flex items-center cursor-pointer relative">
-                    <input type="checkbox" className="sr-only" checked={config.hasTopRebar} onChange={e => { setConfig({...config, hasTopRebar: e.target.checked}); setSelectedRebar(null); }} />
-                    <div className={`w-8 h-4 rounded-full transition-colors ${config.hasTopRebar ? 'bg-purple-500' : 'bg-slate-300'}`}></div>
-                    <div className={`absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${config.hasTopRebar ? 'translate-x-4' : ''}`}></div>
-                  </label>
-                </div>
-                {config.hasTopRebar && (
-                  <div className="grid grid-cols-2 gap-2 animate-in fade-in duration-300">
-                    <div className="flex flex-col gap-1"><label className="text-[11px] text-slate-500">面筋直径 (mm)</label><input type="number" step="2" value={config.topD} onChange={e => { setConfig({...config, topD: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border border-purple-200 rounded text-sm font-mono focus:ring-1 focus:ring-purple-400 outline-none" /></div>
-                    <div className="flex flex-col gap-1"><label className="text-[11px] text-slate-500">面筋间距 (mm)</label><input type="number" step="10" value={config.topSpacing} onChange={e => { setConfig({...config, topSpacing: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border border-purple-200 rounded text-sm font-mono focus:ring-1 focus:ring-purple-400 outline-none" /></div>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-3 border-t border-blue-200/50 mt-3">
-                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">22G101-1 柱插筋</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col gap-1"><label className="text-[11px] text-slate-500">柱截面 b (mm)</label><input type="number" step="50" value={config.colB} onChange={e => { setConfig({...config, colB: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono" /></div>
-                  <div className="flex flex-col gap-1"><label className="text-[11px] text-slate-500">
+                <div className="grid grid-cols-
