@@ -18,10 +18,7 @@ export default function Header() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900 border-b border-slate-800 backdrop-blur-md bg-slate-900/90 h-14 shadow-lg">
       <div className="max-w-screen-2xl mx-auto px-4 h-full flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-           {/* 👇 Logo 已经为您换成了“宋” */}
            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black shadow-[0_0_15px_rgba(37,99,235,0.5)]">宋</div>
-           
-           {/* 👇 您的全新招牌在这里！ */}
            <div className="flex items-baseline gap-1.5 hidden sm:flex">
              <span className="text-white font-bold text-sm tracking-wide">小宋的</span>
              <span className="text-blue-400 font-black text-sm italic tracking-widest">钢筋世界</span>
