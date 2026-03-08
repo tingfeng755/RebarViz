@@ -8,7 +8,54 @@ import dynamic from 'next/dynamic';
 const BeamViewer = dynamic(() => import('@/components/BeamViewer'), { ssr: false });
 
 // 🚧 听风专属：楼板与面筋 3D 坐标生成器 (通过 children 注入到梁的宇宙中)
+// 🚧 听风专属：楼板与面筋 3D 坐标生成器 (已修复单位缩放比例)
 function SlabInjectionMesh({ params }) {
+  // 核心修复：原作者的 3D 宇宙单位是米，我们需要把毫米 * 0.001
+  const scale = 0.001; 
+
+  // 读取梁的真实尺寸并缩放
+  const h = (params?.h || 600) * scale;      
+  const b = (params?.b || 300) * scale;      
+  const span = (params?.spanLength || params?.span || 4000) * scale; 
+  
+  // 楼板厚度 120mm 和 保护层下沉 20mm
+  const slabT = 120 * scale; 
+  const slabY = (h / 2) - (slabT / 2);
+  const cover = 20 * scale;
+  
+  // 钢筋直径 16mm 和 弯折 15d (约 15*16=240mm)
+  const rebarD = 16 * scale;
+  const bendL = 240 * scale;
+
+  return (
+    <group>
+      {/* 1. 浇筑楼板混凝土 (半透明蓝色) */}
+      <mesh position={[0, slabY, 0]}>
+        <boxGeometry args={[span, slabT, 2000 * scale]} />
+        <meshStandardMaterial color="#38bdf8" transparent opacity={0.25} depthWrite={false} />
+      </mesh>
+      
+      {/* 2. 核心构造演示：板面筋的空间穿插与 15d 弯折 */}
+      <group position={[0, (h / 2) - cover, 0]}>
+         {/* 横向受力面筋直段 (粉红色钢筋) */}
+         <mesh>
+           <boxGeometry args={[span, rebarD, rebarD]} />
+           <meshStandardMaterial color="#ec4899" />
+         </mesh>
+         {/* 左端部向下弯折锚固段 */}
+         <mesh position={[-span/2 + (rebarD/2), -bendL/2, 0]}>
+           <boxGeometry args={[rebarD, bendL, rebarD]} />
+           <meshStandardMaterial color="#ec4899" />
+         </mesh>
+         {/* 右端部向下弯折锚固段 */}
+         <mesh position={[span/2 - (rebarD/2), -bendL/2, 0]}>
+           <boxGeometry args={[rebarD, bendL, rebarD]} />
+           <meshStandardMaterial color="#ec4899" />
+         </mesh>
+      </group>
+    </group>
+  );
+}
   // 读取梁的真实尺寸，计算楼板的穿插坐标
   const h = params?.h || 600;      // 梁高
   const b = params?.b || 300;      // 梁宽
