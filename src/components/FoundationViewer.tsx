@@ -324,3 +324,19 @@ export default function FoundationViewer() {
               <div className="pt-3 border-t border-blue-200/50 mt-3">
                 <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">22G101-1 柱插筋</p>
                 <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-slate-500">柱截面 b (mm)</label>
+                    <input type="number" step="50" value={config.colB} onChange={e => { setConfig({...config, colB: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-slate-500">柱截面 h (mm)</label>
+                    <input type="number" step="50" value={config.colH} onChange={e => { setConfig({...config, colH: Number(e.target.value)}); setSelectedRebar(null); }} className="p-1 border rounded text-sm font-mono" />
+                  </div>
+                </div>
+              </div>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
