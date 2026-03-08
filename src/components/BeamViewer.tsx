@@ -1308,7 +1308,7 @@ function BeamScene({ params, selected, onSelect, cutPosition, concreteOpacity, s
   );
 }
 
-export default function BeamViewer({ children, params, selected, /* 其他参数... */ }: any) {
+export default function BeamViewer({ children, params, cutPosition, showCut, onCutPositionChange, onShowCutChange }: {
   params: BeamParams;
   cutPosition: number | null;
   showCut: boolean;
@@ -1579,10 +1579,8 @@ export default function BeamViewer({ children, params, selected, /* 其他参数
           <BeamScene params={params} selected={selected} onSelect={setSelected} cutPosition={cutPosition} concreteOpacity={concreteOpacity} showDimensions={showDimensions} visibleGroups={visibleGroups} />
           <Grid args={[gridSize, gridSize]} position={[0, -0.01, 0]} cellColor="#E2E8F0" sectionColor="#E2E8F0" fadeDistance={gridSize * 1.5} />
           <axesHelper args={[1]} />
-          <OrbitControls target={[0, hm / 2, 0]} enableDamping dampingFactor={0.1} />
-       <OrbitControls target={[0, hm / 2, 0]} enabledDamping dampingFactor={0.1} />
-      {children}  {/* <-- 这是听风老板专属的 3D 物理后门！ */}
-    </Canvas>
+         {children} <OrbitControls target={[0, hm / 2, 0]} enableDamping dampingFactor={0.1} />
+        </Canvas>
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/50 text-white/80 text-[11px] px-4 py-1.5 rounded-full backdrop-blur-md pointer-events-none">
           <span>左键旋转</span>
           <span className="w-px h-3 bg-white/20" />
