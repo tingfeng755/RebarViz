@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 
 const BeamViewer = dynamic(() => import('@/components/BeamViewer'), { ssr: false });
 
-// 🚧 听风专属：楼板与双层【双向正交】钢筋网 3D 阵列生成器 (增加点击雷达)
+// 🚧 听风专属：楼板与双向钢筋网 3D 阵列生成器
 function SlabInjectionMesh({ params, onSelectSlab }) {
   const scale = 0.001; 
   const h = (params?.h || 600) * scale;      
@@ -27,13 +27,11 @@ function SlabInjectionMesh({ params, onSelectSlab }) {
   const startX = -span / 2 + spacing / 2;
   const xPositions = Array.from({ length: countX }).map((_, i) => startX + i * spacing);
 
-  // 专属雷达事件：拦截鼠标点击，上报数据
   const handleRebarClick = (e, info) => {
-    e.stopPropagation(); // 阻止点击穿透到后面的梁
+    e.stopPropagation(); 
     onSelectSlab(info);
   };
 
-  // 鼠标悬停变小手
   const cursorProps = {
     onPointerOver: (e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; },
     onPointerOut: (e) => { document.body.style.cursor = 'auto'; }
@@ -49,22 +47,28 @@ function SlabInjectionMesh({ params, onSelectSlab }) {
       
       {/* 🔵 板底受力筋网 */}
       <group position={[0, slabY - (slabT/2) + cover + d/2, 0]}>
-        {/* 底层横向筋 */}
         {xPositions.map((x, i) => (
           <mesh 
             key={`bottom-x-${i}`} position={[x, 0, 0]} 
-            onClick={(e) => handleRebarClick(e, { name: '板底横向受力筋', spec: 'HRB400 Φ14 @200', desc: '主要承受板底正弯矩，位于最底层', color: 'bg-blue-600' })}
+            onClick={(e) => handleRebarClick(e, { 
+              name: '板底横向受力筋', spec: 'HRB400 Φ14 @200', 
+              formula: 'L_bottom ≥ MAX(b/2, 5d)', calcLabel: '端部锚固', calcValue: '直锚入支座',
+              desc: '主要承受板底正弯矩，位于最底层', color: 'bg-blue-600', uiColor: 'blue' 
+            })}
             {...cursorProps}
           >
             <boxGeometry args={[d, d, slabWidth]} />
             <meshStandardMaterial color="#2563eb" /> 
           </mesh>
         ))}
-        {/* 底层纵向筋 */}
         {zPositions.map((z, i) => (
           <mesh 
             key={`bottom-z-${i}`} position={[0, d, z]}
-            onClick={(e) => handleRebarClick(e, { name: '板底纵向分布筋', spec: 'HRB400 Φ14 @200', desc: '固定受力筋，形成钢筋网，紧贴受力筋上方', color: 'bg-blue-400' })}
+            onClick={(e) => handleRebarClick(e, { 
+              name: '板底纵向分布筋', spec: 'HRB400 Φ14 @200', 
+              formula: 'L_bottom ≥ MAX(b/2, 5d)', calcLabel: '端部锚固', calcValue: '直锚入支座',
+              desc: '固定受力筋，形成钢筋网，紧贴受力筋上方', color: 'bg-blue-500', uiColor: 'blue' 
+            })}
             {...cursorProps}
           >
             <boxGeometry args={[span, d, d]} />
@@ -75,11 +79,14 @@ function SlabInjectionMesh({ params, onSelectSlab }) {
 
       {/* 🔴 板面负弯矩筋网 */}
       <group position={[0, (h / 2) - cover - d/2, 0]}>
-         {/* 面层横向筋 */}
          {xPositions.map((x, i) => (
           <group 
             key={`top-x-${i}`} position={[x, 0, 0]}
-            onClick={(e) => handleRebarClick(e, { name: '板面横向负弯矩筋', spec: 'HRB400 Φ14 @200', desc: '承受支座负弯矩，端部有15d下弯锚固，位于最顶层', color: 'bg-pink-600' })}
+            onClick={(e) => handleRebarClick(e, { 
+              name: '板面横向负弯矩筋', spec: 'HRB400 Φ14 @200', 
+              formula: 'L_bend = 15d', calcLabel: '弯折长度 (15×14)', calcValue: '210 mm',
+              desc: '承受支座负弯矩，端部有 15d 下弯锚固，位于最顶层', color: 'bg-pink-600', uiColor: 'pink' 
+            })}
             {...cursorProps}
           >
             <mesh><boxGeometry args={[d, d, slabWidth]} /><meshStandardMaterial color="#db2777" /></mesh>
@@ -87,11 +94,14 @@ function SlabInjectionMesh({ params, onSelectSlab }) {
             <mesh position={[0, -bendL/2, slabWidth/2 - d/2]}><boxGeometry args={[d, bendL, d]} /><meshStandardMaterial color="#db2777" /></mesh>
           </group>
         ))}
-        {/* 面层纵向筋 */}
         {zPositions.map((z, i) => (
           <group 
             key={`top-z-${i}`} position={[0, -d, z]}
-            onClick={(e) => handleRebarClick(e, { name: '板面纵向分布筋', spec: 'HRB400 Φ14 @200', desc: '固定负弯矩筋，位于横向面筋下方', color: 'bg-pink-400' })}
+            onClick={(e) => handleRebarClick(e, { 
+              name: '板面纵向分布筋', spec: 'HRB400 Φ14 @200', 
+              formula: 'L_bend = 15d', calcLabel: '弯折长度 (15×14)', calcValue: '210 mm',
+              desc: '固定负弯矩筋，两端构造下弯，位于横向面筋下方', color: 'bg-pink-500', uiColor: 'pink' 
+            })}
             {...cursorProps}
           >
             <mesh><boxGeometry args={[span, d, d]} /><meshStandardMaterial color="#f472b6" /></mesh>
@@ -106,7 +116,7 @@ function SlabInjectionMesh({ params, onSelectSlab }) {
 
 export default function BeamSlabViewer({ params, isMobile }) {
   const [activeTab, setActiveTab] = useState('bottom');
-  const [selectedSlabRebar, setSelectedSlabRebar] = useState(null); // 新增：板钢筋专属被点击状态
+  const [selectedSlabRebar, setSelectedSlabRebar] = useState(null); 
 
   return (
     <div className="flex flex-col lg:flex-row w-full h-full min-h-[80vh] bg-slate-50 relative">
@@ -117,9 +127,10 @@ export default function BeamSlabViewer({ params, isMobile }) {
           ✅ 梁板节点：真实 3D 穿插注入完成！
         </div>
 
-        {/* 专属悬浮信息卡片（只有点击了板钢筋才会出现） */}
+        {/* 专属悬浮信息卡片（全面升级版） */}
         {selectedSlabRebar && (
-          <div className="absolute top-16 right-4 z-20 w-72 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
+          <div className="absolute top-16 right-4 z-20 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
+            {/* 卡片头部 */}
             <div className={`${selectedSlabRebar.color} px-4 py-3 flex justify-between items-center text-white`}>
               <h3 className="font-bold text-md flex items-center gap-2">
                 <span>🔍</span> {selectedSlabRebar.name}
@@ -131,14 +142,37 @@ export default function BeamSlabViewer({ params, isMobile }) {
                 ✕
               </button>
             </div>
-            <div className="p-4 space-y-3">
+            
+            {/* 卡片内容区 */}
+            <div className="p-4 space-y-4">
+              {/* 基础信息 */}
               <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                 <span className="text-slate-500 text-sm">规格间距</span>
                 <span className="font-mono font-bold text-slate-800">{selectedSlabRebar.spec}</span>
               </div>
+              
+              {/* 核心亮点：图集公式区块 */}
+              {selectedSlabRebar.formula && (
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-2">
+                  <div className="flex justify-between items-center">
+                     <span className="text-slate-500 text-xs font-bold">📚 22G101 构造公式</span>
+                  </div>
+                  <div className={`font-mono font-bold text-center p-2 rounded border ${selectedSlabRebar.uiColor === 'pink' ? 'bg-pink-50 border-pink-200 text-pink-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                    {selectedSlabRebar.formula}
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-200/60 mt-2">
+                    <span className="text-slate-500 text-sm">{selectedSlabRebar.calcLabel}</span>
+                    <span className={`font-mono font-bold text-lg ${selectedSlabRebar.uiColor === 'pink' ? 'text-pink-600' : 'text-blue-600'}`}>
+                      {selectedSlabRebar.calcValue}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 构造说明 */}
               <div>
-                <span className="text-slate-500 text-sm block mb-1">构造说明</span>
-                <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-2 rounded">
+                <span className="text-slate-500 text-sm block mb-1">说明</span>
+                <p className="text-sm text-slate-700 leading-relaxed">
                   {selectedSlabRebar.desc}
                 </p>
               </div>
