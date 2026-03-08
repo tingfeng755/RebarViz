@@ -14,8 +14,8 @@ const NAV = [
   { href: '/shearwall', label: '墙 Q', desc: '剪力墙', icon: Wallpaper },
   { href: '/slab', label: '板 LB', desc: '楼板', icon: LayoutGrid },
   { href: '/joint', label: '节点', desc: '梁柱节点', icon: GitMerge },
-  // 🚀 听风精准插入：独立基础导航节点
-  { href: '/foundation', label: '基础 DJ', desc: '独立基础', icon: Layers },
+  // 👇 就是下面这一行！为了绝对安全，我们借用已经存在的 Box 图标
+  { href: '/foundation', label: '基础 DJ', desc: '独立基础', icon: Box },
 ];
 
 type SidebarMode = 'expanded' | 'collapsed' | 'hidden';
