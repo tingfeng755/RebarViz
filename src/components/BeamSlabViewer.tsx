@@ -10,25 +10,20 @@ const BeamViewer = dynamic(() => import('@/components/BeamViewer'), { ssr: false
 function SlabInjectionMesh({ params, onSelectSlab, slabConfig }) {
   const scale = 0.001; 
   
-  // 1. 接收来自咱们控制台的动态数据！
   const { slabT: slabT_mm, d: d_mm, spacing: spacing_mm } = slabConfig;
 
-  // 读取梁的数据
   const h = (params?.h || 600) * scale;      
   const span = (params?.spanLength || params?.span || 4000) * scale; 
   
-  // 应用动态楼板数据
   const slabT = slabT_mm * scale; 
   const slabWidth = 2000 * scale; 
   const slabY = (h / 2) - (slabT / 2);
   const cover = 15 * scale; 
   const d = d_mm * scale; 
   
-  // 动态重算：15d 弯折长度
   const bendL = 15 * d;     
   const spacing = spacing_mm * scale; 
 
-  // 动态重算：根据新间距排布多少根钢筋
   const countZ = Math.floor(slabWidth / spacing);
   const startZ = -slabWidth / 2 + spacing / 2;
   const zPositions = Array.from({ length: countZ }).map((_, i) => startZ + i * spacing);
@@ -128,7 +123,6 @@ export default function BeamSlabViewer({ params, isMobile }) {
   const [activeTab, setActiveTab] = useState('bottom');
   const [selectedSlabRebar, setSelectedSlabRebar] = useState(null); 
   
-  // 核心中枢：专属楼板数据状态机 (默认值 120厚, 14直径, 200间距)
   const [slabConfig, setSlabConfig] = useState({ slabT: 120, d: 14, spacing: 200 });
 
   return (
@@ -136,9 +130,8 @@ export default function BeamSlabViewer({ params, isMobile }) {
       
       {/* 👑 左侧：3D 核心渲染区 */}
       <div className="flex-1 relative border-r border-slate-200" style={{ minHeight: '500px' }}>
-        <div className="absolute top-4 left-4 z-10 bg-emerald-600 text-white px-4 py-2 rounded shadow-md font-bold cursor-pointer">
-          ✅ 梁板节点：专属参数化引擎启动！
-        </div>
+        
+        {/* （绿色的标签牌已拆除） */}
 
         {/* 专属悬浮信息卡片 */}
         {selectedSlabRebar && (
@@ -208,7 +201,6 @@ export default function BeamSlabViewer({ params, isMobile }) {
                    onChange={e => {
                      const newD = Number(e.target.value);
                      setSlabConfig({...slabConfig, d: newD});
-                     // 每次改直径，先把弹窗关掉以免出现旧数据
                      setSelectedSlabRebar(null); 
                    }} 
                    className="w-24 p-1.5 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none text-center font-mono" 
