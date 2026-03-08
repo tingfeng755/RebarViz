@@ -9,66 +9,93 @@ const BeamViewer = dynamic(() => import('@/components/BeamViewer'), { ssr: false
 
 // 🚧 听风专属：楼板与面筋 3D 坐标生成器 (已彻底修复单位缩放比例)
 // 🚧 听风专属：楼板与双层钢筋网 3D 阵列生成器
+// 🚧 听风专属：楼板与双层【双向正交】钢筋网 3D 阵列生成器
 function SlabInjectionMesh({ params }) {
   const scale = 0.001; 
 
-  // 读取梁的尺寸
   const h = (params?.h || 600) * scale;      
   const span = (params?.spanLength || params?.span || 4000) * scale; 
   
-  // 楼板物理尺寸
   const slabT = 120 * scale; 
-  const slabWidth = 2000 * scale; // 模拟 2 米宽的楼板
+  const slabWidth = 2000 * scale; 
   const slabY = (h / 2) - (slabT / 2);
   
-  // 钢筋参数
-  const cover = 15 * scale; // 保护层 15mm
-  const d = 12 * scale;     // 钢筋直径放大到 12mm 以便观察
-  const bendL = 15 * d;     // 15d 弯折长度
-  const spacing = 200 * scale; // 钢筋间距 @200
+  const cover = 15 * scale; 
+  const d = 14 * scale; // 钢筋直径稍微加粗到 14mm 方便视觉观察
+  const bendL = 15 * d;     
+  const spacing = 200 * scale; // 间距 @200
 
-  // 算法：计算在 2 米宽的板里，需要排布多少根钢筋
+  // 算法1：计算纵向钢筋（顺着梁方向，Z轴排布）
   const countZ = Math.floor(slabWidth / spacing);
   const startZ = -slabWidth / 2 + spacing / 2;
-  // 生成每一根钢筋的 Z 轴坐标数组
   const zPositions = Array.from({ length: countZ }).map((_, i) => startZ + i * spacing);
+
+  // 算法2：计算横向钢筋（垂直于梁方向，X轴排布）
+  const countX = Math.floor(span / spacing);
+  const startX = -span / 2 + spacing / 2;
+  const xPositions = Array.from({ length: countX }).map((_, i) => startX + i * spacing);
 
   return (
     <group>
-      {/* 1. 浇筑半透明楼板，透明度调低，防止挡住钢筋 */}
+      {/* 1. 浇筑半透明楼板 */}
       <mesh position={[0, slabY, 0]}>
         <boxGeometry args={[span, slabT, slabWidth]} />
         <meshStandardMaterial color="#38bdf8" transparent opacity={0.15} depthWrite={false} />
       </mesh>
       
-      {/* 2. 🔵 板底受力筋网 (@200 间距排布) */}
+      {/* 2. 🔵 板底受力筋网 (双向编织) */}
       <group position={[0, slabY - (slabT/2) + cover + d/2, 0]}>
+        {/* 底层横向筋 (垂直于梁，受力最大，放在最下层) */}
+        {xPositions.map((x, i) => (
+          <mesh key={`bottom-x-${i}`} position={[x, 0, 0]}>
+            <boxGeometry args={[d, d, slabWidth]} />
+            <meshStandardMaterial color="#2563eb" /> {/* 深蓝色 */}
+          </mesh>
+        ))}
+        {/* 底层纵向筋 (顺着梁，放在横向筋的上面，Y轴抬高一个直径 d) */}
         {zPositions.map((z, i) => (
-          <mesh key={`bottom-rebar-${i}`} position={[0, 0, z]}>
+          <mesh key={`bottom-z-${i}`} position={[0, d, z]}>
             <boxGeometry args={[span, d, d]} />
-            <meshStandardMaterial color="#2563eb" /> {/* 蓝色代表底筋 */}
+            <meshStandardMaterial color="#60a5fa" /> {/* 浅蓝色区分层级 */}
           </mesh>
         ))}
       </group>
 
-      {/* 3. 🔴 板面负弯矩筋网 (@200 间距排布，带 15d 弯折，下沉避让梁主筋) */}
+      {/* 3. 🔴 板面负弯矩筋网 (双向编织，带 15d 弯折) */}
       <group position={[0, (h / 2) - cover - d/2, 0]}>
-         {zPositions.map((z, i) => (
-          <group key={`top-rebar-${i}`} position={[0, 0, z]}>
-            {/* 面筋直段 */}
+         {/* 面层横向筋 (垂直于梁，放在最顶层) */}
+         {xPositions.map((x, i) => (
+          <group key={`top-x-${i}`} position={[x, 0, 0]}>
+            <mesh>
+              <boxGeometry args={[d, d, slabWidth]} />
+              <meshStandardMaterial color="#db2777" /> {/* 深粉色 */}
+            </mesh>
+            {/* 横向面筋两端的 15d 下弯 */}
+            <mesh position={[0, -bendL/2, -slabWidth/2 + d/2]}>
+              <boxGeometry args={[d, bendL, d]} />
+              <meshStandardMaterial color="#db2777" />
+            </mesh>
+            <mesh position={[0, -bendL/2, slabWidth/2 - d/2]}>
+              <boxGeometry args={[d, bendL, d]} />
+              <meshStandardMaterial color="#db2777" />
+            </mesh>
+          </group>
+        ))}
+        {/* 面层纵向筋 (顺着梁，被横向筋压在下面，Y轴降低一个直径 d) */}
+        {zPositions.map((z, i) => (
+          <group key={`top-z-${i}`} position={[0, -d, z]}>
             <mesh>
               <boxGeometry args={[span, d, d]} />
-              <meshStandardMaterial color="#ec4899" />
+              <meshStandardMaterial color="#f472b6" /> {/* 浅粉色区分层级 */}
             </mesh>
-            {/* 左端部 15d 向下弯折 */}
+            {/* 纵向面筋两端的 15d 下弯 */}
             <mesh position={[-span/2 + d/2, -bendL/2, 0]}>
               <boxGeometry args={[d, bendL, d]} />
-              <meshStandardMaterial color="#ec4899" />
+              <meshStandardMaterial color="#f472b6" />
             </mesh>
-            {/* 右端部 15d 向下弯折 */}
             <mesh position={[span/2 - d/2, -bendL/2, 0]}>
               <boxGeometry args={[d, bendL, d]} />
-              <meshStandardMaterial color="#ec4899" />
+              <meshStandardMaterial color="#f472b6" />
             </mesh>
           </group>
         ))}
