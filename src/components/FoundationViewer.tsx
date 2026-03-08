@@ -22,32 +22,41 @@ function SmoothBar({ points, radius, color }) {
 
 function Scene({ config, onSelect }) {
   const s = 0.001;
+  // 🚀 修复：把面筋相关的变量 (hasTop, topD, topS) 重新加回了解构中！防崩溃！
   const { 
     foundL:L, foundB:B, foundH:H, foundD, foundS,
     colB:cb, colH:ch, colD, nx, nz, 
-    cover:c, conc, seismic 
+    cover:c, conc, seismic,
+    hasTop, topD, topS 
   } = config;
   
   const lae = Math.ceil((LAB_MAP[conc]||35) * (Z_MAP[seismic]||1.0) * colD);
   const bend = Math.max(6 * colD, 150);
 
+  // 防崩溃参数兜底
   const fD = (foundD || 14) * s;
+  const fSpacing = foundS || 200;
+  const tD = (topD || 12) * s;
+  const tSpacing = topS || 200;
+
   const bY = -H*s + c*s + fD/2;
   const tY = bY + fD;
+  const topMeshY = -c*s - tD/2;
   const bottomY = tY + fD/2;
   const bendR = colD * 2.5 * s;
 
-  // 🚀 底筋双向网格逻辑
+  // 🔵 底筋双向网格
   const gridX = useMemo(() => {
-    const n = Math.max(2, Math.floor((B - 2*c) / foundS) + 1);
+    const n = Math.max(2, Math.floor((B - 2*c) / fSpacing) + 1);
     return Array.from({length:n}, (_,i) => -B*s/2 + c*s + i*((B-2*c)*s/(n-1)));
-  }, [B, c, foundS]);
+  }, [B, c, fSpacing]);
 
   const gridZ = useMemo(() => {
-    const n = Math.max(2, Math.floor((L - 2*c) / foundS) + 1);
+    const n = Math.max(2, Math.floor((L - 2*c) / fSpacing) + 1);
     return Array.from({length:n}, (_,i) => -L*s/2 + c*s + i*((L-2*c)*s/(n-1)));
-  }, [L, c, foundS]);
+  }, [L, c, fSpacing]);
 
+  // 🔴 柱筋矩阵
   const colRebars = useMemo(() => {
     const rb = [];
     const sx = (cb - 2*c)/(nx-1); const sz = (ch - 2*c)/(nz-1);
@@ -72,13 +81,21 @@ function Scene({ config, onSelect }) {
   return (
     <group position={[0, H*s/2, 0]}>
       <mesh position={[0, -H*s/2, 0]}><boxGeometry args={[L*s, H*s, B*s]} /><meshStandardMaterial color="#38bdf8" transparent opacity={0.1} depthWrite={false} /></mesh>
-      <mesh position={[0, 0.6, 0]}><boxGeometry args={[cb*s, 1.2, ch*s]} /><meshStandardMaterial color="#94a3b8" transparent opacity={0.15} depthWrite={false} /></mesh>
+      
       <group>
         {gridX.map((z, i) => (<mesh key={`bx-${i}`} position={[0, bY, z]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[fD/2, fD/2, L*s-2*c*s, 8]} /><meshStandardMaterial color="#2563eb" /></mesh>))}
         {gridZ.map((x, i) => (<mesh key={`bz-${x}`} position={[x, tY, 0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[fD/2, fD/2, B*s-2*c*s, 8]} /><meshStandardMaterial color="#3b82f6" /></mesh>))}
       </group>
+
+      {hasTop && (
+        <group>
+          {Array.from({length:Math.floor((B-2*c)/tSpacing)+1}).map((_,i)=>(<mesh key={`tx-${i}`} position={[0, topMeshY, -B*s/2+c*s+i*tSpacing*s]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[tD/2, tD/2, L*s-2*c*s, 8]} /><meshStandardMaterial color="#a855f7" /></mesh>))}
+          {Array.from({length:Math.floor((L-2*c)/tSpacing)+1}).map((_,i)=>(<mesh key={`tz-${i}`} position={[-L*s/2+c*s+i*tSpacing*s, topMeshY-tD, 0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[tD/2, tD/2, B*s-2*c*s, 8]} /><meshStandardMaterial color="#c084fc" /></mesh>))}
+        </group>
+      )}
+
       {colRebars.map(rb => (
-        <group key={rb.id} onClick={(e) => { e.stopPropagation(); onSelect({ name:'柱纵向插筋', spec:`Φ${colD}`, val:`${lae}mm`, formula:`lae = ζae × lab = ${(lae/colD).toFixed(1)}d`, desc:`弯折取max(6d,150)=${bend}mm` }); }}>
+        <group key={rb.id} onClick={(e) => { e.stopPropagation(); onSelect({ name:'柱纵向插筋', spec:`Φ${colD}`, val:`${lae}mm`, formula:`lae = ζae × lab = ${(lae/colD).toFixed(1)}d`, desc:`22G101 弯折要求: max(6d, 150)=${bend}mm` }); }}>
           <SmoothBar points={rb.pts} radius={colD*s/2} color="#dc2626" />
         </group>
       ))}
@@ -89,51 +106,77 @@ function Scene({ config, onSelect }) {
 export default function FoundationViewer() {
   const [m, setM] = useState(false);
   const [sel, setSel] = useState(null);
-  const [cfg, setCfg] = useState({ foundL:2000, foundB:2000, foundH:600, foundD:14, foundS:200, colB:600, colH:600, colD:25, nx:4, nz:4, c:40, conc:'C30', seismic:'二级' });
+  const [cfg, setCfg] = useState({ 
+    foundL:2000, foundB:2000, foundH:600, foundD:14, foundS:200, 
+    colB:600, colH:600, colD:25, nx:4, nz:4, c:40, 
+    conc:'C30', seismic:'二级', hasTop:false, topD:12, topS:200 
+  });
+
   useEffect(() => setM(true), []);
+
   return (
     <div className="flex flex-col lg:flex-row w-full h-screen bg-white overflow-hidden text-slate-900">
       <div className="flex-1 relative bg-slate-50">
-        <div className="absolute top-6 left-6 z-10 font-black italic text-slate-800">22G101 独立基础 DJ 实验室</div>
+        <div className="absolute top-6 left-6 z-10"><h1 className="text-xl font-black italic tracking-tighter">独立基础 DJ <span className="text-blue-600">3D 可视化</span></h1></div>
+        
         {sel && (
           <div className="absolute top-6 right-6 z-50 w-72 bg-white/95 backdrop-blur rounded-3xl shadow-2xl border p-6 animate-in slide-in-from-right">
-             <div className="flex justify-between items-center mb-5 font-bold"><span>{sel.name}</span><button onClick={()=>setSel(null)}>✕</button></div>
-             <div className="bg-slate-900 rounded-2xl p-5 text-center text-white"><p className="text-4xl font-black font-mono">{sel.val}</p><p className="text-[11px] text-blue-400 mt-2 font-mono italic">{sel.formula}</p></div>
+             <div className="flex justify-between items-center mb-5 font-bold"><span>{sel.name}</span><button onClick={()=>setSel(null)} className="text-slate-300">✕</button></div>
+             <div className="bg-slate-900 rounded-2xl p-5 text-center text-white shadow-xl">
+                <p className="text-[10px] text-slate-500 uppercase mb-1">22G101 锚固长度</p>
+                <p className="text-4xl font-black font-mono tracking-tighter">{sel.val}</p>
+                <p className="text-[11px] text-blue-400 mt-2 font-mono italic">{sel.formula}</p>
+             </div>
              <p className="text-[11px] text-slate-500 mt-4 border-l-2 border-red-500 pl-3 italic">{sel.desc}</p>
           </div>
         )}
-        <div className="w-full h-full">{m && <Canvas camera={{position:[3,2,4], fov:35}}><ambientLight intensity={0.8} /><pointLight position={[10,10,10]} intensity={1} /><Scene config={cfg} onSelect={setSel} /><Grid args={[12,12]} cellColor="#cbd5e1" sectionColor="#94a3b8" /><OrbitControls makeDefault /></Canvas>}</div>
+
+        <div className="w-full h-full">
+          {m && (
+            <Canvas camera={{position:[3.5, 2.5, 3.5], fov:35}}>
+              <ambientLight intensity={0.8} />
+              <pointLight position={[10, 10, 10]} intensity={1.5} />
+              <Scene config={cfg} onSelect={setSel} />
+              <Grid args={[12, 12]} cellColor="#cbd5e1" sectionColor="#94a3b8" />
+              <OrbitControls makeDefault />
+            </Canvas>
+          )}
+        </div>
       </div>
+
       <div className="w-full lg:w-96 bg-white p-8 shadow-2xl border-l overflow-y-auto">
-        <h3 className="font-black text-slate-800 mb-8 border-b pb-4 italic tracking-tighter text-lg underline decoration-blue-500 decoration-4 underline-offset-8">3D 实验室控制台</h3>
+        <h3 className="font-black text-slate-800 mb-8 border-b pb-4 italic">📐 参数控制面板</h3>
         <div className="space-y-8">
           <section className="space-y-4">
-            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded inline-block">1. 基础几何尺寸 (mm)</p>
+            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded inline-block">1. 基础几何与底筋 (mm)</p>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><label className="text-[11px] font-bold text-slate-400 tracking-tighter">基础长 L</label><input type="number" value={cfg.foundL} onChange={e=>setCfg({...cfg,foundL:Number(e.target.value)})} className="w-full p-2 bg-slate-50 rounded-xl text-xs font-mono font-bold" /></div>
-              <div className="space-y-1"><label className="text-[11px] font-bold text-slate-400 tracking-tighter">基础宽 B</label><input type="number" value={cfg.foundB} onChange={e=>setCfg({...cfg,foundB:Number(e.target.value)})} className="w-full p-2 bg-slate-50 rounded-xl text-xs font-mono font-bold" /></div>
-              <div className="space-y-1"><label className="text-[11px] font-bold text-slate-400 tracking-tighter">基础高 H</label><input type="number" value={cfg.foundH} onChange={e=>setCfg({...cfg,foundH:Number(e.target.value)})} className="w-full p-2 bg-slate-50 rounded-xl text-xs font-mono font-bold" /></div>
-              <div className="space-y-1"><label className="text-[11px] font-bold text-blue-600 tracking-tighter underline">底筋 Φ</label><input type="number" value={cfg.foundD} onChange={e=>setCfg({...cfg,foundD:Number(e.target.value)})} className="w-full p-2 bg-blue-50 border border-blue-100 rounded-xl text-xs font-mono font-bold text-blue-600" /></div>
+              <div className="space-y-1"><label className="text-[11px] font-bold text-slate-400">基础长度 L</label><input type="number" value={cfg.foundL} onChange={e=>setCfg({...cfg,foundL:Number(e.target.value)})} className="w-full p-2 bg-slate-50 rounded-xl text-xs font-mono font-bold" /></div>
+              <div className="space-y-1"><label className="text-[11px] font-bold text-slate-400">基础宽度 B</label><input type="number" value={cfg.foundB} onChange={e=>setCfg({...cfg,foundB:Number(e.target.value)})} className="w-full p-2 bg-slate-50 rounded-xl text-xs font-mono font-bold" /></div>
+              <div className="space-y-1"><label className="text-[11px] font-bold text-slate-400">基础高度 H</label><input type="number" value={cfg.foundH} onChange={e=>setCfg({...cfg,foundH:Number(e.target.value)})} className="w-full p-2 bg-slate-50 rounded-xl text-xs font-mono font-bold" /></div>
+              <div className="space-y-1"><label className="text-[11px] font-bold text-slate-400">底筋间距 S</label><input type="number" value={cfg.foundS} onChange={e=>setCfg({...cfg,foundS:Number(e.target.value)})} className="w-full p-2 bg-slate-50 rounded-xl text-xs font-mono font-bold" /></div>
+              <div className="space-y-1 col-span-2"><label className="text-[11px] font-bold text-blue-600">底筋直径 d</label><input type="number" value={cfg.foundD} onChange={e=>setCfg({...cfg,foundD:Number(e.target.value)})} className="w-full p-2 bg-blue-50 border border-blue-100 rounded-xl text-xs font-mono font-bold text-blue-600" /></div>
             </div>
           </section>
+
           <section className="space-y-4 pt-4 border-t">
-            <p className="text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50 px-2 py-1 rounded inline-block">2. 柱子与排筋</p>
+            <p className="text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50 px-2 py-1 rounded inline-block">2. 柱构件及排布</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><label className="text-[11px] font-bold text-slate-400">柱宽 b</label><input type="number" value={cfg.colB} onChange={e=>setCfg({...cfg,colB:Number(e.target.value)})} className="w-full p-2 bg-slate-50 rounded-xl text-xs font-mono font-bold" /></div>
               <div className="space-y-1"><label className="text-[11px] font-bold text-slate-400">柱高 h</label><input type="number" value={cfg.colH} onChange={e=>setCfg({...cfg,colH:Number(e.target.value)})} className="w-full p-2 bg-slate-50 rounded-xl text-xs font-mono font-bold" /></div>
-              <div className="space-y-1"><label className="text-[11px] font-bold text-red-600 tracking-tighter">纵筋 Φ</label><input type="number" value={cfg.colD} onChange={e=>setCfg({...cfg,colD:Number(e.target.value)})} className="w-full p-2 bg-red-50 border border-red-100 rounded-xl text-xs font-mono font-bold text-red-600" /></div>
+              <div className="space-y-1"><label className="text-[11px] font-bold text-red-600">纵筋 Φ</label><input type="number" value={cfg.colD} onChange={e=>setCfg({...cfg,colD:Number(e.target.value)})} className="w-full p-2 bg-red-50 border border-red-100 rounded-xl text-xs font-mono font-bold text-red-600" /></div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-[11px] text-slate-400 font-bold tracking-tighter">X 向根数</label><input type="range" min="2" max="10" value={cfg.nx} onChange={e=>setCfg({...cfg,nx:parseInt(e.target.value)})} className="w-full accent-red-600" /><div className="text-right text-[10px] font-bold text-red-600">{cfg.nx} 根</div></div>
-              <div><label className="text-[11px] text-slate-400 font-bold tracking-tighter">Z 向根数</label><input type="range" min="2" max="10" value={cfg.nz} onChange={e=>setCfg({...cfg,nz:parseInt(e.target.value)})} className="w-full accent-red-600" /><div className="text-right text-[10px] font-bold text-red-600">{cfg.nz} 根</div></div>
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <div><label className="text-[11px] text-slate-400 font-bold">X向根数</label><input type="range" min="2" max="10" value={cfg.nx} onChange={e=>setCfg({...cfg,nx:parseInt(e.target.value)})} className="w-full accent-red-600" /></div>
+              <div><label className="text-[11px] text-slate-400 font-bold">Z向根数</label><input type="range" min="2" max="10" value={cfg.nz} onChange={e=>setCfg({...cfg,nz:parseInt(e.target.value)})} className="w-full accent-red-600" /></div>
             </div>
           </section>
+
           <section className="space-y-4 pt-4 border-t">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">3. 材料环境</p>
-            <div className="grid grid-cols-2 gap-3">
-              <select value={cfg.conc} onChange={e=>setCfg({...cfg,conc:e.target.value})} className="p-2.5 bg-slate-50 border-none rounded-xl text-xs font-bold">{Object.keys(LAB_MAP).map(g=><option key={g} value={g}>{g}</option>)}</select>
-              <select value={cfg.seismic} onChange={e=>setCfg({...cfg,seismic:e.target.value})} className="p-2.5 bg-slate-50 border-none rounded-xl text-xs font-bold">{Object.keys(Z_MAP).map(g=><option key={g} value={g}>{g}</option>)}</select>
-            </div>
+             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">3. 材料与计算环境</p>
+             <div className="grid grid-cols-2 gap-3">
+               <select value={cfg.conc} onChange={e=>setCfg({...cfg,conc:e.target.value})} className="p-2.5 bg-slate-50 border-none rounded-xl text-xs font-bold">{Object.keys(LAB_MAP).map(g=><option key={g} value={g}>{g}</option>)}</select>
+               <select value={cfg.seismic} onChange={e=>setCfg({...cfg,seismic:e.target.value})} className="p-2.5 bg-slate-50 border-none rounded-xl text-xs font-bold">{Object.keys(Z_MAP).map(g=><option key={g} value={g}>{g}</option>)}</select>
+             </div>
           </section>
         </div>
       </div>
