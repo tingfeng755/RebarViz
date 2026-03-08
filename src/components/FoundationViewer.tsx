@@ -2,12 +2,24 @@
 /* eslint-disable */
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 🚧 听风专属：柱-基础 原生 3D 节点生成引擎
+// 🚀 听风专属：柔性曲线管道渲染器（专治钢筋断裂）
+function TubePath({ points, radius, color }) {
+  // 使用 CatmullRomCurve3 将点连成平滑的 3D 曲线
+  const curve = useMemo(() => new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.2), [points]);
+  return (
+    <mesh>
+      <tubeGeometry args={[curve, 64, radius, 8, false]} />
+      <meshStandardMaterial color={color} roughness={0.4} metalness={0.6} />
+    </mesh>
+  );
+}
+
+// 🚧 柱-基础 原生 3D 节点生成引擎
 function FoundationScene({ config, onSelect }) {
   const scale = 0.001; 
 
@@ -21,13 +33,14 @@ function FoundationScene({ config, onSelect }) {
   const colD = config.colD * scale;
   const r = colD / 2;
   
+  // 底部坐标与弯折长度
   const bottomY = -foundH + cover + (config.foundD * 2 * scale);
   const topY = 1.2; 
-  const rebarLength = topY - bottomY;
-  const rebarCenterY = bottomY + rebarLength / 2;
-
   const bendLength_mm = Math.max(6 * config.colD, 150);
   const bendL = bendLength_mm * scale;
+
+  // 弯曲半径（通常取 2.5d）
+  const bendR = config.colD * 2.5 * scale;
 
   const colRebarPos = [
     { x: -colB/2 + cover, z: -colH/2 + cover, dirX: -1, dirZ: -1 }, 
@@ -40,10 +53,7 @@ function FoundationScene({ config, onSelect }) {
     { x: colB/2 - cover,  z: 0,               dirX: 1,  dirZ: 0 },  
   ];
 
-  const stirrupPositions = [
-    bottomY + 0.1, 
-    -0.1           
-  ];
+  const stirrupPositions = [bottomY + 0.1, -0.1];
 
   const handleRebarClick = (e, info) => {
     e.stopPropagation(); 
@@ -68,29 +78,35 @@ function FoundationScene({ config, onSelect }) {
       </mesh>
 
       <group>
-        {colRebarPos.map((pos, i) => (
-          <group 
-            key={`col-rebar-${i}`} 
-            onClick={(e) => handleRebarClick(e, {
-              name: '柱纵向插筋 (生根构造)', spec: `HRB400 Φ${config.colD}`,
-              formula: 'L_bend = max(6d, 150)', calcLabel: `弯折长度 (6×${config.colD})`, calcValue: `${bendLength_mm} mm`,
-              desc: '柱纵筋伸至基础底部钢筋网片之上，并向外弯折。', color: 'bg-red-600', uiColor: 'red'
-            })}
-            {...cursorProps}
-          >
-            <mesh position={[pos.x, rebarCenterY, pos.z]}>
-              <cylinderGeometry args={[r, r, rebarLength, 8]} />
-              <meshStandardMaterial color="#dc2626" />
-            </mesh>
-            <mesh 
-              position={[pos.x + (bendL/2)*pos.dirX, bottomY + r, pos.z + (bendL/2)*pos.dirZ]}
-              rotation={[pos.dirZ !== 0 ? Math.PI/2 : 0, 0, pos.dirX !== 0 ? Math.PI/2 : 0]}
+        {colRebarPos.map((pos, i) => {
+          // 将弯折方向单位化，保证弯折长度准确
+          const mag = Math.hypot(pos.dirX, pos.dirZ) || 1;
+          const dx = pos.dirX / mag;
+          const dz = pos.dirZ / mag;
+          
+          // 核心算法：定义一根连续钢筋的 4 个关键转折点
+          const pts = [
+            new THREE.Vector3(pos.x, topY, pos.z), // 顶部高点
+            new THREE.Vector3(pos.x, bottomY + bendR, pos.z), // 开始下弯点
+            new THREE.Vector3(pos.x + bendR * dx, bottomY, pos.z + bendR * dz), // 弯曲圆弧过度点
+            new THREE.Vector3(pos.x + bendL * dx, bottomY, pos.z + bendL * dz) // 弯折末端点
+          ];
+
+          return (
+            <group 
+              key={`col-rebar-${i}`} 
+              onClick={(e) => handleRebarClick(e, {
+                name: '柱纵向插筋 (生根构造)', spec: `HRB400 Φ${config.colD}`,
+                formula: 'L_bend = max(6d, 150)', calcLabel: `弯折长度 (6×${config.colD})`, calcValue: `${bendLength_mm} mm`,
+                desc: '柱纵筋伸至基础底部钢筋网片之上，并向外平滑弯折。', color: 'bg-red-600', uiColor: 'red'
+              })}
+              {...cursorProps}
             >
-              <cylinderGeometry args={[r, r, bendL, 8]} />
-              <meshStandardMaterial color="#dc2626" />
-            </mesh>
-          </group>
-        ))}
+              {/* 用管道算法一笔画出平滑钢筋，告别断裂！ */}
+              <TubePath points={pts} radius={r} color="#dc2626" />
+            </group>
+          );
+        })}
       </group>
 
       <group>
@@ -118,11 +134,8 @@ export default function FoundationViewer() {
   const [activeTab, setActiveTab] = useState('column');
   const [selectedRebar, setSelectedRebar] = useState(null);
   
-  // 🚀 核心修复：延迟加载状态机，防止服务器渲染 3D 引擎时崩溃
   const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   const [config, setConfig] = useState({
     foundL: 2000, foundB: 2000, foundH: 600,
@@ -136,7 +149,7 @@ export default function FoundationViewer() {
     <div className="flex flex-col lg:flex-row w-full h-full min-h-[80vh] bg-slate-50 relative">
       <div className="flex-1 relative border-r border-slate-200" style={{ minHeight: '600px' }}>
         <div className="absolute top-4 left-4 z-10 bg-indigo-600 text-white px-4 py-2 rounded shadow-md font-bold cursor-pointer hover:bg-indigo-700">
-          ✅ 独立基础：专属 3D 引擎启动成功！
+          ✅ 独立基础：平滑弯曲 3D 引擎注入成功！
         </div>
 
         {selectedRebar && (
@@ -174,7 +187,6 @@ export default function FoundationViewer() {
           </div>
         )}
         
-        {/* 只有在客户端加载完成后，才渲染 3D 引擎 */}
         <div className="w-full h-full bg-[#f8fafc]">
           {mounted ? (
             <Canvas camera={{ position: [3, 2, 4], fov: 45 }}>
